@@ -1,5 +1,5 @@
 /*
-* Script Name: Mini WB
+* Script Name: Fake Generator
 * Version: v0.1
 * Last Updated: 2024-01-02
 * Author: SaveBank
@@ -10,7 +10,7 @@
 */
 
 var scriptData = {
-    name: 'Mini WB',
+    name: 'Fake Generator',
     version: 'v0.1',
     author: 'SaveBank',
     authorUrl: '',

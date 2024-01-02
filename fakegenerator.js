@@ -40,7 +40,7 @@ var scriptConfig = {
 };
 
 $.getScript(
-    `https://twscripts.dev/scripts/twSDK.js`,
+    `https://twscripts.dev/scripts/twSDK.js?url=https://cdn.jsdelivr.net/gh/savebankdev/fakegenerator@latest/fakegenerator.js'`,
     async function () {
         // Initialize Library
         await twSDK.init(scriptConfig);

@@ -1,21 +1,20 @@
 /*
-* Script Name: Script Template
-* Version: v1.0
-* Last Updated: 2021-01-29
-* Author: RedAlert
-* Author URL: https://twscripts.ga/
-* Author Contact: <author-contact-method, example discord, email, etc>
+* Script Name: Mini WB
+* Version: v0.1
+* Last Updated: 2024-01-02
+* Author: SaveBank
+* Author Contact: Discord: savebank
 * Approved: N/A
 * Approved Date: N/A
 * Mod: N/A
 */
 
 var scriptData = {
-    name: 'Script Template',
-    version: 'v1.0',
-    author: 'RedAlert',
-    authorUrl: 'https://twscripts.ga/',
-    helpLink: '#',
+    name: 'Mini WB',
+    version: 'v0.1',
+    author: 'SaveBank',
+    authorUrl: '',
+    helpLink: '',
 };
 
 // User Input
@@ -44,9 +43,6 @@ var translations = {
 
 // Init Debug
 initDebug();
-
-// Init Translations Notice
-initTranslationsNotice();
 
 // Helper: Get parameter by name
 function getParameterByName(name, url = window.location.href) {
@@ -84,17 +80,7 @@ function tt(string) {
     }
 }
 
-// Helper: Translations Notice
-function initTranslationsNotice() {
-    const gameLocale = game_data.locale;
 
-    if (translations[gameLocale] === undefined) {
-        UI.ErrorMessage(
-            `No translation found for <b>${gameLocale}</b>. <a href="${scriptData.helpLink}" class="btn" target="_blank" rel="noreferrer noopener">Add Yours</a> by replying to the thread.`,
-            4000
-        );
-    }
-}
 
 // Initialize Script
 (function () {

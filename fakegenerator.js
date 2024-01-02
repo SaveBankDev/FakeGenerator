@@ -22,14 +22,12 @@ var scriptConfig = {
     },
     translations: {
         en_DK: {
-            'Script Template': 'Script Template',
+            'Redirecting...': 'Redirecting...',
             Help: 'Help',
-            'Invalid game mode!': 'Invalid game mode!',
         },
         en_US: {
-            'Script Template': 'Script Template',
+            'Redirecting...': 'Redirecting...',
             Help: 'Help',
-            'Invalid game mode!': 'Invalid game mode!',
         }
     },
     allowedMarkets: [],
@@ -40,7 +38,7 @@ var scriptConfig = {
 };
 
 $.getScript(
-    `https://twscripts.dev/scripts/twSDK.js?url=https://cdn.jsdelivr.net/gh/savebankdev/fakegenerator@latest/fakegenerator.js`,
+    `https://twscripts.dev/scripts/twSDK.js?url=https://cdn.jsdelivr.net/gh/savebankdev/fakegenerator@main/fakegenerator.js`,
     async function () {
         // Initialize Library
         await twSDK.init(scriptConfig);

@@ -13,8 +13,12 @@
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 
+// Global variable
+var DEFAULT_ATTACKSPERBUTTON = 20
+
 var scriptConfig = {
     scriptData: {
+        prefix: 'fakegenerator',
         name: 'Fake Generator',
         version: 'v0.1',
         author: 'SaveBank',
@@ -70,6 +74,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const groups = await fetchVillageGroups();
         const { worldConfig } = twSDK.getWorldConfig();
 
+
         // Entry point
         (async function () {
             try {
@@ -78,8 +83,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     // Redirect to correct screen if necessary
                     UI.InfoMessage(twSDK.tt('Redirecting...'));
                     twSDK.redirectTo('overview_villages&combined');
+                } else {
+                    renderUI(groups);
+                    addEventHandlers();
                 }
-                renderUI(groups);
             } catch (error) {
                 UI.ErrorMessage(twSDK.tt('There was an error!'));
                 console.error(`${scriptInfo} Error:`, error);
@@ -112,7 +119,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 </div>
 				<div>
 					<label>${twSDK.tt('Attacks per Button')}</label>
-					<input id="raAttackPerButton" type="text" value="1">
+					<input id="raAttPerBut" type="text" value="${DEFAULT_ATTACKSPERBUTTON}">
 				</div>
 
 			</div>
@@ -165,6 +172,51 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
+        // Add event handlers and data storage
+        function addEventHandlers() {
+            // For the Group dropdown menu
+            jQuery('#raGroupsFilter').on('change', function (e) {
+                e.preventDefault();
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} selected group ID: `, e.target.value);
+                }
+                localStorage.setItem(`${scriptConfig.scriptData.prefix}_chosen_group`, e.target.value);
+            });
+            // For the Attacks per Button Option
+            localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON)
+            jQuery('#raAttPerBut').val(localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON)
+            jQuery('#raAttPerBut').on('change', function (e) {
+                e.preventDefault();
+                e.target.value = e.target.value.replace(/\D/g, '')
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Attacks per Button: `, e.target.value);
+                }
+                if (e.target.value < 1 || isNaN(parseInt(e.target.value))) {
+                    jQuery('#raAttPerBut').val(DEFAULT_ATTACKSPERBUTTON);
+                    e.target.value = DEFAULT_ATTACKSPERBUTTON;
+                }
+                localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, e.target.value);
+            });
+            jQuery('#coordInput').on('change', function (e) {
+                e.preventDefault();
+                const coordinates = this.value.match(twSDK.coordsRegex);
+                if (coordinates) {
+                    this.value = coordinates.join(' ');
+                    jQuery('#coordInput').text(coordinates.length);
+                } else {
+                    this.value = '';
+                    jQuery('#coordInput').text(0);
+                }
+            });
+            // For the Calculate Fakes Button
+            jQuery('#calculateFakes').on('click', function (e) {
+                e.preventDefault();
+                if (DEBUG) {
+                    console.debug('Started Calculations');
+                }
+            });
+        }
+
         // Helper: Render groups filter
         function renderGroupsFilter() {
             const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
@@ -201,11 +253,92 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
             const villageGroups = await jQuery.get(fetchGroups).then((response) => response).catch((error) => {
                 UI.ErrorMessage('Error fetching village groups!');
-                console.error(`${scriptInfo()} Error:`, error);
+                console.error(`${scriptInfo} Error:`, error);
             }
             );
 
             return villageGroups;
         }
+        // Helper: Fetch home troop counts for current group
+        async function fetchTroopsForCurrentGroup(groupId) {
+            const mobileCheck = $('#mobileHeader').length > 0;
+            const troopsForGroup = await jQuery.get(game_data.link_base_pure + `overview_villages&mode=combined&group=${groupId}&page=-1`).then(async (response) => {
+                const htmlDoc = jQuery.parseHTML(response);
+                const homeTroops = [];
+
+                if (mobileCheck) {
+                    let table = jQuery(htmlDoc).find('#combined_table tr.nowrap');
+                    for (let i = 0; i < table.length; i++) {
+                        let objTroops = {};
+                        let coord = table[i].getElementsByClassName('quickedit-label')[0].innerHTML;
+                        let villageId = parseInt(table[i].getElementsByClassName('quickedit-vn')[0].getAttribute('data-id'));
+                        let listTroops = Array.from(table[i].getElementsByTagName('img')).filter((e) => e.src.includes('unit')).map((e) => ({
+                            name: e.src.split('unit_')[1].replace('@2x.png', ''),
+                            value: parseInt(e.parentElement.nextElementSibling.innerText),
+                        }));
+                        listTroops.forEach((item) => {
+                            objTroops[item.name] = item.value;
+                        }
+                        );
+                        objTroops.coord = twSDK.getCoordFromString(coord);
+                        objTroops.villageId = villageId;
+
+                        homeTroops.push(objTroops);
+                    }
+                } else {
+                    const combinedTableRows = jQuery(htmlDoc).find('#combined_table tr.nowrap');
+                    const combinedTableHead = jQuery(htmlDoc).find('#combined_table tr:eq(0) th');
+
+                    const combinedTableHeader = [];
+
+                    // Collect possible buildings and troop types
+                    jQuery(combinedTableHead).each(function () {
+                        const thImage = jQuery(this).find('img').attr('src');
+                        if (thImage) {
+                            let thImageFilename = thImage.split('/').pop();
+                            thImageFilename = thImageFilename.replace('.png', '');
+                            combinedTableHeader.push(thImageFilename);
+                        } else {
+                            combinedTableHeader.push(null);
+                        }
+                    });
+
+                    // Collect possible troop types
+                    combinedTableRows.each(function () {
+                        let rowTroops = {};
+
+                        combinedTableHeader.forEach((tableHeader, index) => {
+                            if (tableHeader) {
+                                if (tableHeader.includes('unit_')) {
+                                    const coord = twSDK.getCoordFromString(jQuery(this).find('td:eq(1) span.quickedit-label').text());
+                                    const villageId = jQuery(this).find('td:eq(1) span.quickedit-vn').attr('data-id');
+                                    const unitType = tableHeader.replace('unit_', '');
+                                    rowTroops = {
+                                        ...rowTroops,
+                                        villageId: parseInt(villageId),
+                                        coord: coord,
+                                        [unitType]: parseInt(jQuery(this).find(`td:eq(${index})`).text()),
+                                    };
+                                }
+                            }
+                        }
+                        );
+
+                        homeTroops.push(rowTroops);
+                    });
+                }
+
+                return homeTroops;
+            }
+            ).catch((error) => {
+                UI.ErrorMessage(tt('An error occured while fetching troop counts!'));
+                console.error(`${scriptInfo} Error:`, error);
+            }
+            );
+
+            return troopsForGroup;
+        }
+
+
     }
 );

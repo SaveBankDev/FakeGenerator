@@ -64,10 +64,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
     async function () {
         // Initialize Library
         await twSDK.init(scriptConfig);
-        // const scriptInfo = twSDK.scriptInfo();
+        const scriptInfo = twSDK.scriptInfo();
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');
-
+        const groups = await fetchVillageGroups();
         const { worldConfig } = twSDK.getWorldConfig();
 
         // Entry point
@@ -79,7 +79,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     UI.InfoMessage(twSDK.tt('Redirecting...'));
                     twSDK.redirectTo('overview_villages&combined');
                 }
-                renderUI();
+                renderUI(groups);
             } catch (error) {
                 UI.ErrorMessage(twSDK.tt('There was an error!'));
                 console.error(`${scriptInfo} Error:`, error);
@@ -97,8 +97,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         - Number of Fakes generated / Number of total possible Fakes
         - Buttons to open Fakes in new tab to send (Prefill troop amount: 1 Spy and min amount of Cats)
         */
-        function renderUI() {
-            const groupsFilter = renderGroupsFilter();
+        function renderUI(groups) {
+            const groupsFilter = renderGroupsFilter(groups);
 
             const content = `
         <div class="ra-fake-generator" id="raFakeGenerator">
@@ -148,27 +148,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
 			${mobiledevice ? '.ra-fake-generator { margin: 5px; border-radius: 10px; } .ra-fake-generator h2 { margin: 0 0 10px 0; font-size: 18px; } .ra-fake-generator .ra-grid { grid-template-columns: 1fr } .ra-fake-generator .ra-grid > div { margin-bottom: 15px; } .ra-fake-generator .btn { margin-bottom: 8px; margin-right: 8px; } .ra-fake-generator select { height: auto; } .ra-fake-generator input[type="text"] { height: auto; } .ra-hide-on-mobile { display: none; }' : '.ra-fake-generator .ra-grid { display: grid; grid-template-columns: 150px 1fr 100px 150px 150px; grid-gap: 0 20px; }'}
 
-			/* Normal Table */
-			.ra-table { border-collapse: separate !important; border-spacing: 2px !important; }
-			.ra-table label,
-			.ra-table input { cursor: pointer; margin: 0; }
-			.ra-table th { font-size: 14px; }
-			.ra-table th,
-            .ra-table td { padding: 4px; text-align: center; }
-            .ra-table td a { word-break: break-all; }
-			.ra-table tr:nth-of-type(2n+1) td { background-color: #fff5da; }
-			.ra-table a:focus:not(a.btn) { color: blue; }
-			/* Popup Content */
-			.ra-popup-content { position: relative; display: block; width: 360px; }
-			.ra-popup-content * { box-sizing: border-box; }
-			.ra-popup-content label { font-weight: 600 !important; margin-bottom: 5px; display: block; }
-			.ra-popup-content textarea { width: 100%; height: 100px; resize: none; }
 			/* Helpers */
 			.ra-mb15 { margin-bottom: 15px; }
-			.ra-mb30 { margin-bottom: 30px; }
-			.ra-chosen-command td { background-color: #ffe563 !important; }
-			.ra-text-left { text-align: left !important; }
-			.ra-text-center { text-align: center !important; }
 			.ra-unit-count { display: inline-block; margin-top: 3px; vertical-align: top; }
         </style>
     `;
@@ -186,7 +167,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Render groups filter
         function renderGroupsFilter() {
-            const groups = fetchVillageGroups();
             const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
             let groupsFilter = `
 		<select name="ra_groups_filter" id="raGroupsFilter">

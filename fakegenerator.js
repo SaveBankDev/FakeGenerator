@@ -12,9 +12,12 @@
 
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
+if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
 
 // Global variable
-var DEFAULT_ATTACKSPERBUTTON = 20
+var DEFAULT_ATTACKSPERBUTTON = 20;
+var coord_regex = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g;
+
 
 var scriptConfig = {
     scriptData: {
@@ -199,7 +202,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             });
             jQuery('#coordInput').on('change', function (e) {
                 e.preventDefault();
-                const coordinates = this.value.match(twSDK.coordsRegex);
+                const coordinates = this.value.match(coord_regex);
                 if (coordinates) {
                     this.value = coordinates.join(' ');
                     jQuery('#coordInput').text(coordinates.length);

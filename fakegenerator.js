@@ -251,6 +251,50 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         }
 
 
+        // Helper: Create send buttons
+        function createSendButtons(created_send_links, nr_split) {
+            let number_of_buttons = Math.ceil(created_send_links.length / nr_split);
+            let ms_delay = parseInt(document.getElementById('delay_tabs').value);
+
+            ms_delay = Number.isNaN(ms_delay) == true || ms_delay < 200 ? 200 : ms_delay;
+            for (let i = 0; i < number_of_buttons; i++) {
+                let button_lower_fake_number = i * nr_split;
+                let button_upper_fake_number = i * nr_split + nr_split;
+
+                if (i * nr_split + nr_split > created_send_links.length) {
+                    button_upper_fake_number = created_send_links.length;
+                }
+
+                let send_button = document.createElement('button');
+                send_button.classList = 'btn evt-confirm-btn btn-confirm-yes open_tab';
+                send_button.innerText = '[ ' + button_lower_fake_number + ' - ' + button_upper_fake_number + ' ]';
+                send_button.style.margin = '5px';
+
+                send_button.onclick = function () {
+                    let created_send_links_for_this_button = created_send_links.slice(button_lower_fake_number, button_upper_fake_number);
+                    send_button.classList.remove('evt-confirm-btn');
+                    send_button.classList.remove('btn-confirm-yes');
+                    send_button.classList.add('btn-confirm-no');
+
+                    for (let j = 0; j < created_send_links_for_this_button.length; j++) {
+                        window.setTimeout(() => {
+                            window.open(created_send_links_for_this_button[j], '_blank');
+                            if (DEBUG) {
+                                console.debug(new Date().getTime());
+                            }
+                        }, ms_delay * j);
+                    }
+
+                    $('.open_tab').prop('disabled', true);
+                    window.setTimeout(() => {
+                        $('.open_tab').prop('disabled', false);
+                    }, ms_delay * (button_upper_fake_number - button_lower_fake_number));
+
+                }
+
+                document.getElementById('div_open_tabs').appendChild(send_button);
+            }
+        }
         // Helper: Render groups filter
         function renderGroupsFilter() {
             const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;

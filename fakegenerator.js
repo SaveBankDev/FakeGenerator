@@ -16,7 +16,8 @@ if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
 
 // Global variable
 var DEFAULT_ATTACKSPERBUTTON = 20;
-var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g;
+var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
+var NIGHT_BONUS_OFFSET = 5 * 60 * 1000;  // 5 minutes before Night bonus to give players time to send the attacks
 
 
 var scriptConfig = {
@@ -215,7 +216,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 e.preventDefault();
 
                 let player_villages;
-                let target_coords = []
+                let target_coords = [];
 
                 target_coords = jQuery('#coordInput').val().trim().match(COORD_REGEX);
                 const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
@@ -248,25 +249,45 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             player_villages
             target_coords
             world_config (unitSpeed, worldSpeed, night[active, start_hour, end_hour], fake_limit)
-            cat_speed ?
+            cat_speed 
+
+            Calculation:
+            TODO Implement checkLandingTime to check if it would land in nighttime if its active
         */
         function calculateFakes(player_villages, target_coords, night_info, unit_speed, world_speed, fake_limit, cat_speed) {
-            for (let vill of player_villages) {
-                console.log(vill);
+
+            const actual_cat_speed = cat_speed * (unit_speed * world_speed);
+            var combinations = {};
+            let current_time = Date.now();
+
+            for (let target_coord of target_coords) {
+                combinations[target_coord] = [];
+                for (let player_village of player_villages) {
+                    distance = twSDK.calculateDistance(player_village.coord, target_coord);
+                    travel_time = twSDK.getTravelTimeInSecond(distance, actual_cat_speed) * 1000;
+                    if (checkValidArrivalTime(parseInt(night_info.start_hour), parseInt(night_info.end_hour), (current_time + travel_time))) {
+                        combinations[target_coord] = combinations[target_coord].push(player_village);
+                    }
+                }
             }
-            console.log(target_coords);
-            console.log(night_info);
-            console.log(unit_speed);
-            console.log(world_speed);
-            console.log(fake_limit);
-            console.log(cat_speed)
-            console.log(typeof (unit_speed));
-            console.log(typeof (world_speed));
-            console.log(typeof (fake_limit));
-            console.log(typeof (cat_speed))
             return;
         }
+        // Helper: Checks if the arrival time is not in the night bonus
+        function checkValidArrivalTime(start_hour, end_hour, timestamp) {
+            const time = new Date(timestamp);
+            const currentHour = time.getHours();
+            const currentMinutes = time.getMinutes();
 
+            const check_start_nb = start_hour - (NIGHT_BONUS_OFFSET / 60); // We want to arrive shortly before the night bonus to give the player time to send the attacks
+            const check_end_nb = end_hour;
+
+            if (check_end_nb <= check_start_nb) {
+                return (currentHour + currentMinutes / 60 >= check_end_nb && currentHour + currentMinutes / 60 < check_start_nb);
+            } else {
+                // If the nigth bonus spans across midnight
+                return (currentHour + currentMinutes / 60 >= check_end_nb || currentHour + currentMinutes / 60 < check_start_nb);
+            }
+        }
 
         // TODO finish cleaning up and completing html/css
         // Helper: Create send buttons

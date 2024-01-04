@@ -75,7 +75,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');
         const groups = await fetchVillageGroups();
-        const { worldConfig } = twSDK.getWorldConfig();
+        const worldConfig = await twSDK.getWorldConfig();
 
 
         // Entry point
@@ -87,7 +87,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     UI.InfoMessage(twSDK.tt('Redirecting...'));
                     twSDK.redirectTo('overview_villages&combined');
                 } else {
-                    renderUI(groups);
+                    renderUI();
                     addEventHandlers();
                 }
             } catch (error) {
@@ -107,8 +107,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         - Number of Fakes generated / Number of total possible Fakes
         - Buttons to open Fakes in new tab to send (Prefill troop amount: 1 Spy and min amount of Cats)
         */
-        function renderUI(groups) {
-            const groupsFilter = renderGroupsFilter(groups);
+        function renderUI() {
+            const groupsFilter = renderGroupsFilter();
 
             const content = `
         <div class="ra-fake-generator" id="raFakeGenerator">
@@ -179,7 +179,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         function addEventHandlers() {
             // For the Group dropdown menu
             jQuery('#raGroupsFilter').on('change', function (e) {
-                e.preventDefault();
                 if (DEBUG) {
                     console.debug(`${scriptInfo} selected group ID: `, e.target.value);
                 }
@@ -189,7 +188,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON)
             jQuery('#raAttPerBut').val(localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON)
             jQuery('#raAttPerBut').on('change', function (e) {
-                e.preventDefault();
                 e.target.value = e.target.value.replace(/\D/g, '')
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Attacks per Button: `, e.target.value);
@@ -201,7 +199,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, e.target.value);
             });
             jQuery('#coordInput').on('change', function (e) {
-                e.preventDefault();
                 const coordinates = this.value.match(coord_regex);
                 if (coordinates) {
                     this.value = coordinates.join(' ');
@@ -212,13 +209,47 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
             });
             // For the Calculate Fakes Button
-            jQuery('#calculateFakes').on('click', function (e) {
+            jQuery('#calculateFakes').on('click', async function (e) {
                 e.preventDefault();
-                if (DEBUG) {
-                    console.debug('Started Calculations');
+
+                let troop_data;
+                let target_coords = []
+
+                target_coords = jQuery('#coordInput').val().trim().match(coord_regex);
+                const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
+
+                try {
+                    troop_data = await fetchTroopsForCurrentGroup(parseInt(groupId));
+                    if (DEBUG) {
+                        console.debug(troop_data);
+                        console.debug(typeof (troop_data));
+                    }
+                } catch (error) {
+                    UI.ErrorMessage(twSDK.tt('There was an error!'));
+                    console.error(`${scriptInfo} Error:`, error);
                 }
+
+                if (DEBUG) {
+                    console.debug(target_coords);
+                    console.debug(typeof (target_coords));
+                    console.debug(worldConfig);
+                    console.debug(typeof (worldConfig));
+                }
+                calculateFakes(troop_data, target_coords, worldConfig);
+
             });
         }
+        /*  Main calculation function
+            Input:
+            troop_data
+            target_coords
+            world_config (unitSpeed, worldSpeed, night[active, start_hour, end_hour], fake_limit)
+        */
+        function calculateFakes(troop_data, target_coords, world_info) {
+
+            return;
+        }
+
 
         // Helper: Render groups filter
         function renderGroupsFilter() {

@@ -16,7 +16,7 @@ if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
 
 // Global variable
 var DEFAULT_ATTACKSPERBUTTON = 20;
-var coord_regex = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g;
+var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g;
 
 
 var scriptConfig = {
@@ -76,6 +76,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const isValidMode = twSDK.checkValidLocation('mode');
         const groups = await fetchVillageGroups();
         const worldConfig = await twSDK.getWorldConfig();
+        const worldUnitInfo = await twSDK.getWorldUnitInfo();
+
 
 
         // Entry point
@@ -199,7 +201,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, e.target.value);
             });
             jQuery('#coordInput').on('change', function (e) {
-                const coordinates = this.value.match(coord_regex);
+                const coordinates = this.value.match(COORD_REGEX);
                 if (coordinates) {
                     this.value = coordinates.join(' ');
                     jQuery('#coordInput').text(coordinates.length);
@@ -212,45 +214,61 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             jQuery('#calculateFakes').on('click', async function (e) {
                 e.preventDefault();
 
-                let troop_data;
+                let player_villages;
                 let target_coords = []
 
-                target_coords = jQuery('#coordInput').val().trim().match(coord_regex);
+                target_coords = jQuery('#coordInput').val().trim().match(COORD_REGEX);
                 const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
 
+                if (DEBUG) {
+                    console.debug(target_coords);
+                    console.debug(worldConfig);
+                    console.debug(worldUnitInfo);
+                }
+
                 try {
-                    troop_data = await fetchTroopsForCurrentGroup(parseInt(groupId));
+                    player_villages = await fetchTroopsForCurrentGroup(parseInt(groupId));
                     if (DEBUG) {
-                        console.debug(troop_data);
-                        console.debug(typeof (troop_data));
+                        console.debug(player_villages);
                     }
                 } catch (error) {
                     UI.ErrorMessage(twSDK.tt('There was an error!'));
                     console.error(`${scriptInfo} Error:`, error);
                 }
 
-                if (DEBUG) {
-                    console.debug(target_coords);
-                    console.debug(typeof (target_coords));
-                    console.debug(worldConfig);
-                    console.debug(typeof (worldConfig));
-                }
-                calculateFakes(troop_data, target_coords, worldConfig);
+
+                calculateFakes(player_villages, target_coords, worldConfig.config.night, parseInt(worldConfig.config.unit_speed), parseInt(worldConfig.config.speed),
+                    parseInt(worldConfig.config.game.fake_limit), parseInt(worldUnitInfo.config.catapult.speed));
 
             });
         }
+
         /*  Main calculation function
             Input:
-            troop_data
+            player_villages
             target_coords
             world_config (unitSpeed, worldSpeed, night[active, start_hour, end_hour], fake_limit)
+            cat_speed ?
         */
-        function calculateFakes(troop_data, target_coords, world_info) {
-
+        function calculateFakes(player_villages, target_coords, night_info, unit_speed, world_speed, fake_limit, cat_speed) {
+            for (let vill of player_villages) {
+                console.log(vill);
+            }
+            console.log(target_coords);
+            console.log(night_info);
+            console.log(unit_speed);
+            console.log(world_speed);
+            console.log(fake_limit);
+            console.log(cat_speed)
+            console.log(typeof (unit_speed));
+            console.log(typeof (world_speed));
+            console.log(typeof (fake_limit));
+            console.log(typeof (cat_speed))
             return;
         }
 
 
+        // TODO finish cleaning up and completing html/css
         // Helper: Create send buttons
         function createSendButtons(created_send_links, nr_split) {
             let number_of_buttons = Math.ceil(created_send_links.length / nr_split);
@@ -295,6 +313,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 document.getElementById('div_open_tabs').appendChild(send_button);
             }
         }
+
         // Helper: Render groups filter
         function renderGroupsFilter() {
             const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;

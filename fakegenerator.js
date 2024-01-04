@@ -257,9 +257,18 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         function calculateFakes(player_villages, target_coords, night_info, unit_speed, world_speed, fake_limit, cat_speed) {
 
             const actual_cat_speed = cat_speed * (unit_speed * world_speed);
-            var combinations = {};
-            let current_time = Date.now();
+            allCombinations = getAllPossibleCombinations(player_villages, target_coords, actual_cat_speed, night_info);
+            if (DEBUG) {
+                console.debug(allCombinations);
+            }
 
+
+            return;
+        }
+
+        function getAllPossibleCombinations(player_villages, target_coords, unit_speed, night_info) {
+            let combinations = {};
+            let current_time = Date.now();
             for (let target_coord of target_coords) {
                 combinations[target_coord] = [];
                 for (let player_village of player_villages) {
@@ -270,8 +279,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     }
                 }
             }
-            return;
+            return combinations;
         }
+
         // Helper: Checks if the arrival time is not in the night bonus
         function checkValidArrivalTime(start_hour, end_hour, timestamp) {
             const time = new Date(timestamp);

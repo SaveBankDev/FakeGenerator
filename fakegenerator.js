@@ -4,6 +4,7 @@
 * Last Updated: 2024-01-02
 * Author: SaveBank
 * Author Contact: Discord: savebank
+* Contributor: RedAlert 
 * Approved: N/A
 * Approved Date: N/A
 * Mod: N/A
@@ -18,6 +19,20 @@ if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
 var DEFAULT_ATTACKSPERBUTTON = 20;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
 var NIGHT_BONUS_OFFSET = 5 * 60 * 1000;  // 5 minutes before Night bonus to give players time to send the attacks
+var TROOP_POP = {
+    spear: 1,
+    sword: 1,
+    axe: 1,
+    archer: 1,
+    spy: 2,
+    light: 4,
+    marcher: 5,
+    heavy: 6,
+    ram: 5,
+    catapult: 8,
+    knight: 10,
+    snob: 100,
+}
 
 
 var scriptConfig = {
@@ -39,6 +54,11 @@ var scriptConfig = {
             'There was an error!': 'There was an error!',
             'Calculate Fakes': 'Calculate Fakes',
             'Insert target coordinates here': 'Insert target coordinates here',
+            'No target coordinates!': 'No target coordinates!',
+            'There was an error while fetching the data!': 'There was an error while fetching the data!',
+            'Send Spy?': 'Send Spy?',
+            'Yes': 'Yes',
+            'No': 'No',
         },
         en_US: {
             'Redirecting...': 'Redirecting...',
@@ -49,6 +69,11 @@ var scriptConfig = {
             'There was an error!': 'There was an error!',
             'Calculate Fakes': 'Calculate Fakes',
             'Insert target coordinates here': 'Insert target coordinates here',
+            'No target coordinates!': 'No target coordinates!',
+            'There was an error while fetching the data!': 'There was an error while fetching the data!',
+            'Send Spy?': 'Send Spy?',
+            'Yes': 'Yes',
+            'No': 'No',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -59,6 +84,12 @@ var scriptConfig = {
             'There was an error!': 'Es gab einen Fehler!',
             'Calculate Fakes': 'Berechne Fakes',
             'Insert target coordinates here': 'Zielkoordinaten hier einfuegen',
+            'No target coordinates!': 'Keine Zielkoordinaten!',
+            'There was an error while fetching the data!': 'Es gab einen Fehler beim Laden der Daten!',
+            'Send Spy?': 'Späher mitschicken?',
+            'Yes': 'Ja',
+            'No': 'Nein',
+
         }
     },
     allowedMarkets: [],
@@ -76,8 +107,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');
         const groups = await fetchVillageGroups();
-        const worldConfig = await twSDK.getWorldConfig();
-        const worldUnitInfo = await twSDK.getWorldUnitInfo();
+        const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
 
 
 
@@ -112,6 +142,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         */
         function renderUI() {
             const groupsFilter = renderGroupsFilter();
+            const spySelect = renderSpySelect();
 
             const content = `
         <div class="ra-fake-generator" id="raFakeGenerator">
@@ -123,12 +154,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     <label>${twSDK.tt('Group')}</label>
                     ${groupsFilter}
                 </div>
-				<div>
+                <div>
+                    <label>${twSDK.tt('Send Spy?')}</label>
+                    ${spySelect}
+                </div>
+				<div class="number-input">
 					<label>${twSDK.tt('Attacks per Button')}</label>
-					<input id="raAttPerBut" type="text" value="${DEFAULT_ATTACKSPERBUTTON}">
+					<input id="raAttPerBut" type="number" value="${DEFAULT_ATTACKSPERBUTTON}">
 				</div>
-
-			</div>
+            </div>
 		</div>
 		<div class="ra-mb15">
 			<a href="javascript:void(0);" id="calculateFakes" class="btn btn-confirm-yes onclick="">
@@ -138,6 +172,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 		    <div class="ra-mb15">
 		        <textarea id="coordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
 		    </div>
+        </div>
+        <div>
+            <div id="open_tabs" style="display: none;" class="ra-mb15">
+                <h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>
+            </div>
         </div>
             <small>
                 <strong>
@@ -157,13 +196,17 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 			.ra-fake-generator input[type="text"] { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
 			.ra-fake-generator label { font-weight: 600 !important; margin-bottom: 5px; display: block; }
 			.ra-fake-generator select { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
+            .ra-fake-generator input[type="number"] { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
 			.ra-fake-generator .btn-confirm-yes { padding: 3px; }
+            .number-input { display: flex; flex-direction: column; width: 100%; }
+            .number-input label { white-space: nowrap; }
+            .number-input input { width: 100%; }
 
 			${mobiledevice ? '.ra-fake-generator { margin: 5px; border-radius: 10px; } .ra-fake-generator h2 { margin: 0 0 10px 0; font-size: 18px; } .ra-fake-generator .ra-grid { grid-template-columns: 1fr } .ra-fake-generator .ra-grid > div { margin-bottom: 15px; } .ra-fake-generator .btn { margin-bottom: 8px; margin-right: 8px; } .ra-fake-generator select { height: auto; } .ra-fake-generator input[type="text"] { height: auto; } .ra-hide-on-mobile { display: none; }' : '.ra-fake-generator .ra-grid { display: grid; grid-template-columns: 150px 1fr 100px 150px 150px; grid-gap: 0 20px; }'}
 
 			/* Helpers */
 			.ra-mb15 { margin-bottom: 15px; }
-			.ra-unit-count { display: inline-block; margin-top: 3px; vertical-align: top; }
+
         </style>
     `;
 
@@ -180,7 +223,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Add event handlers and data storage
         function addEventHandlers() {
-            // For the Group dropdown menu
+            // For the Group select menu
             jQuery('#raGroupsFilter').on('change', function (e) {
                 if (DEBUG) {
                     console.debug(`${scriptInfo} selected group ID: `, e.target.value);
@@ -201,6 +244,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, e.target.value);
             });
+            // For the Send spy select menu
+            jQuery('#raSendSpy').on('change', function (e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Send Spy: `, e.target.value);
+                }
+                localStorage.setItem(`${scriptConfig.scriptData.prefix}_send_spy`, e.target.value);
+            });
+            //  For the coord input text area
             jQuery('#coordInput').on('change', function (e) {
                 const coordinates = this.value.match(COORD_REGEX);
                 if (coordinates) {
@@ -219,22 +270,36 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let target_coords = [];
 
                 target_coords = jQuery('#coordInput').val().trim().match(COORD_REGEX);
+                if (target_coords.length === 0) {
+                    UI.ErrorMessage(twSDK.tt('No target coordinates!'));
+                    return;
+                }
                 const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
 
                 if (DEBUG) {
-                    console.debug(target_coords);
-                    console.debug(worldConfig);
-                    console.debug(worldUnitInfo);
+                    console.debug(`${scriptInfo} Target coordinates: `, target_coords);
+                    console.debug(`${scriptInfo} worldConfig: `, worldConfig);
+                    console.debug(`${scriptInfo} worldUnitInfo: `, worldUnitInfo);
+                    console.debug(`${scriptInfo} village.txt villages: `, villages); // Risky
                 }
 
                 try {
                     player_villages = await fetchTroopsForCurrentGroup(parseInt(groupId));
                     if (DEBUG) {
-                        console.debug(player_villages);
+                        console.debug(`${scriptInfo} Player villages: `, player_villages);
                     }
                 } catch (error) {
                     UI.ErrorMessage(twSDK.tt('There was an error!'));
                     console.error(`${scriptInfo} Error:`, error);
+                }
+
+                for (player_village of player_villages) {
+                    points = getVillagePoints(player_village.villageId)
+                    player_village.points = points;
+                }
+
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Player villages with points: `, player_villages);
                 }
 
 
@@ -252,34 +317,70 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             cat_speed 
 
             Calculation:
-            TODO Implement checkLandingTime to check if it would land in nighttime if its active
+            TODO 
         */
         function calculateFakes(player_villages, target_coords, night_info, unit_speed, world_speed, fake_limit, cat_speed) {
 
             const actual_cat_speed = cat_speed * (unit_speed * world_speed);
-            allCombinations = getAllPossibleCombinations(player_villages, target_coords, actual_cat_speed, night_info);
+            allCombinations = getAllPossibleCombinations(player_villages, target_coords, actual_cat_speed, night_info, fake_limit);
             if (DEBUG) {
-                console.debug(allCombinations);
+                console.debug(`${scriptInfo} All calculated Combinations: `, allCombinations);
             }
+
+
 
 
             return;
         }
 
-        function getAllPossibleCombinations(player_villages, target_coords, unit_speed, night_info) {
-            let combinations = {};
+        // All possible combinations of player village and target  coords with consideration of arrival time outside the night bonus and minimum catapult am
+        function getAllPossibleCombinations(player_villages, target_coords, unit_speed, night_info, fake_limit) {
+            let result = {};
             let current_time = Date.now();
+            let minCat = 0;
+            let validArrivalTime = false;
             for (let target_coord of target_coords) {
-                combinations[target_coord] = [];
+                result[target_coord] = [];
                 for (let player_village of player_villages) {
                     distance = twSDK.calculateDistance(player_village.coord, target_coord);
-                    travel_time = twSDK.getTravelTimeInSecond(distance, actual_cat_speed) * 1000;
-                    if (checkValidArrivalTime(parseInt(night_info.start_hour), parseInt(night_info.end_hour), (current_time + travel_time))) {
-                        combinations[target_coord] = combinations[target_coord].push(player_village);
+                    travel_time = twSDK.getTravelTimeInSecond(distance, unit_speed) * 1000;
+                    // Check if arrival time would be in night bonus
+                    validArrivalTime = checkValidArrivalTime(parseInt(night_info.start_hour), parseInt(night_info.end_hour), (current_time + travel_time))
+                    // Check the minimum amount of needed catapults 
+                    minCat = getMinAmountOfCatapults(player_village.points, fake_limit);
+                    // If the attack has a valid arrival time and the player village has enough catapults add it to our result 
+                    if (validArrivalTime && player_village.catapult >= minCat) {
+                        result[target_coord] = result[target_coord].push(player_village);
                     }
                 }
             }
-            return combinations;
+            return result;
+        }
+
+        // Helper: Get village points from village.txt with villageId
+        function getVillagePoints(villageId) {
+            for (village of villages) {
+                // If we find the matching villageId in the village.txt we return the points of the village
+                if (villageId === village[0]) {
+                    if (DEBUG) {
+                        console.debug(`${scriptInfo} Found matching villageIds: `, villageId, village[0]);
+                    }
+                    return village[5];
+                }
+            }
+            return 0; // This should never happen
+        }
+
+        // Helper: Get minimum amount of catapults to send depending on if fake_limit is active
+        function getMinAmountOfCatapults(player_village_points, fake_limit) {
+            if (fake_limit === 0) {
+                return 1;
+            } else {
+                // Get the required amount of pop and calculate the next higher amount of catapults to meet the demand
+                req_catapults = Math.floor(((player_village_points * (fake_limit / 100)) + (TROOP_POP.catapult - 1)) / TROOP_POP.catapult);
+                // If the required catapult amount is 0 we still need at least 1 to send a fake
+                return (req_catapults > 0) ? req_catapults : 1;
+            }
         }
 
         // Helper: Checks if the arrival time is not in the night bonus
@@ -292,10 +393,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const check_end_nb = end_hour;
 
             if (check_end_nb <= check_start_nb) {
-                return (currentHour + currentMinutes / 60 >= check_end_nb && currentHour + currentMinutes / 60 < check_start_nb);
+                return ((currentHour + currentMinutes / 60) >= check_end_nb && (currentHour + currentMinutes / 60) < check_start_nb);
             } else {
                 // If the nigth bonus spans across midnight
-                return (currentHour + currentMinutes / 60 >= check_end_nb || currentHour + currentMinutes / 60 < check_start_nb);
+                return ((currentHour + currentMinutes / 60) >= check_end_nb || (currentHour + currentMinutes / 60) < check_start_nb);
             }
         }
 
@@ -329,7 +430,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         window.setTimeout(() => {
                             window.open(created_send_links_for_this_button[j], '_blank');
                             if (DEBUG) {
-                                console.debug(new Date().getTime());
+                                console.debug(`${scriptInfo} Current time: `, new Date().getTime());
                             }
                         }, ms_delay * j);
                     }
@@ -345,7 +446,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
-        // Helper: Render groups filter
+        // Helper: Render groups select
         function renderGroupsFilter() {
             const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
             let groupsFilter = `
@@ -369,6 +470,29 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 	`;
 
             return groupsFilter;
+        }
+
+        // Helper: Render send spy select
+        function renderSpySelect() {
+            const sendSpy = localStorage.getItem(`${scriptConfig.scriptData.prefix}_send_spy`) ?? "yes";
+            let contentSpySelect = `
+            <select id="raSendSpy">
+            `;
+
+            if (sendSpy === "yes") {
+                contentSpySelect += `
+                <option value="yes" selected>${twSDK.tt("Yes")}</option>
+                <option value="no">${twSDK.tt("No")}</option>
+                `
+            } else {
+                contentSpySelect += `
+                <option value="yes">${twSDK.tt("Yes")}</option>
+                <option value="no" selected>${twSDK.tt("No")}</option>
+                `
+            }
+
+            contentSpySelect += `</select>`;
+            return contentSpySelect;
         }
 
         // Helper: Fetch village groups
@@ -467,6 +591,19 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return troopsForGroup;
         }
 
-
+        // Service: Fetch world config and needed data
+        async function fetchWorldConfigData() {
+            try {
+                const worldUnitInfo = await twSDK.getWorldUnitInfo();
+                const villages = await twSDK.worldDataAPI('village');
+                const worldConfig = await twSDK.getWorldConfig();
+                return { villages, worldUnitInfo, worldConfig };
+            } catch (error) {
+                UI.ErrorMessage(
+                    twSDK.tt('There was an error while fetching the data!')
+                );
+                console.error(`${scriptInfo} Error:`, error);
+            }
+        }
     }
 );

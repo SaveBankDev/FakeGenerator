@@ -389,17 +389,21 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     continue;
                 }
 
-                // Sort player villages
-                combination.slice(1).sort((a, b) => {
-                    const countA = counts.get(a) || 0;
-                    const countB = counts.get(b) || 0;
+                // Sort player villages if there are more than 2 player villages for this targetCoord
+                if (combination.slice(1).length > 1) {
+                    combination.slice(1).sort((a, b) => {
+                        const countA = counts.get(a) || 0;
+                        const countB = counts.get(b) || 0;
 
-                    if (countA !== countB) {
-                        return countA - countB;
-                    } else {
-                        return usedPlayerVillages.get(a) - usedPlayerVillages.get(b);
-                    }
-                });
+                        // We first check by how often the player village could be used in future combinations and use the one that could be least often used
+                        if (countA !== countB) {
+                            return countA - countB;
+                        } else {
+                            // Then we check how often a player village has been used in already paired fakes and use the least often used one
+                            return usedPlayerVillages.get(a) - usedPlayerVillages.get(b);
+                        }
+                    });
+                }
 
                 let chosenVillage = null;
                 for (let j = 1; j < combination.length; j++) {

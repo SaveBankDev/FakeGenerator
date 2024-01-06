@@ -1,13 +1,13 @@
 /* 
 * Script Name: Fake Generator
-* Version: v1.0
+* Version: v1.0.1
 * Last Updated: 2024-01-06
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
-* Approved: N/A
-* Approved Date: N/A
-* Mod: N/A
+* Approved: Yes
+* Approved Date: 06.01.2024
+* Mod: RedAlert
 */
 
 
@@ -18,7 +18,7 @@ if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
-var NIGHT_BONUS_OFFSET = 5 * 60 * 1000;  // 5 minutes before Night bonus to give players time to send the attacks
+var NIGHT_BONUS_OFFSET = 10;  // 10 minutes before Night bonus to give players time to send the attacks
 var MIN_ATTACKS_PER_BUTTON = 5;
 var TROOP_POP = {
     spear: 1,
@@ -40,7 +40,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v1.0',
+        version: 'v1.0.1',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -544,13 +544,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Get minimum amount of catapults to send depending on if fakeLimit is active
         function getMinAmountOfCatapults(playerVillagePoints, fakeLimit) {
+            let reqCatapults = 1;
             if (fakeLimit === 0) {
-                return 1;
+                return reqCatapults;
             } else {
                 // Get the required amount of pop and calculate the next higher amount of catapults to meet the demand
-                req_catapults = Math.floor(((playerVillagePoints * (fakeLimit / 100)) + (TROOP_POP.catapult - 1)) / TROOP_POP.catapult);
+                reqCatapults = Math.floor(((playerVillagePoints * (fakeLimit / 100)) + (TROOP_POP.catapult - 1)) / TROOP_POP.catapult);
                 // If the required catapult amount is 0 we still need at least 1 to send a fake
-                return (req_catapults > 0) ? req_catapults : 1;
+                return (reqCatapults > 0) ? reqCatapults : 1;
             }
         }
 

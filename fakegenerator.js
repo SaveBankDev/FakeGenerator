@@ -210,11 +210,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             .number-input { display: flex; flex-direction: column; width: 100%; }
             .number-input label { white-space: nowrap; }
             .number-input input { width: 100%; }
+            .ra-mb15 { margin-bottom: 15px; }
 
 			${mobiledevice ? '.ra-fake-generator { margin: 5px; border-radius: 10px; } .ra-fake-generator h2 { margin: 0 0 10px 0; font-size: 18px; } .ra-fake-generator .ra-grid { grid-template-columns: 1fr } .ra-fake-generator .ra-grid > div { margin-bottom: 15px; } .ra-fake-generator .btn { margin-bottom: 8px; margin-right: 8px; } .ra-fake-generator select { height: auto; } .ra-fake-generator input[type="text"] { height: auto; } .ra-hide-on-mobile { display: none; }' : '.ra-fake-generator .ra-grid { display: grid; grid-template-columns: 150px 1fr 100px 150px 150px; grid-gap: 0 20px; }'}
 
-			/* Helpers */
-			.ra-mb15 { margin-bottom: 15px; }
 
         </style>
     `;
@@ -226,7 +225,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     jQuery('#contentContainer').prepend(content);
                 }
             } else {
-                jQuery('.ra-fake-generator-data').html(body);
+                jQuery('.ra-fake-generator-data').html(content);
             }
         }
 
@@ -355,9 +354,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             //Filter arrays less than 1 in length, meaning only containing the target village
-            if (DEBUG) console.debug(`${scriptInfo} Initial length of allCombinations: ${allCombinations.length}`);
+            if (DEBUG) console.debug(`${scriptInfo} Unfiltered length of allCombinations: ${allCombinations.length}`);
             allCombinations = allCombinations.filter((combination) => combination.length > 1);
-            if (DEBUG) console.debug(`${scriptInfo} Final length of allCombinations: ${allCombinations.length}`);
+            let startingAmountOfComb = allCombinations.length;
+            if (DEBUG) console.debug(`${scriptInfo} Filtered length of allCombinations: ${startingAmountOfComb}`);
 
             /*
             Filter Coordinates where no player villages has been found
@@ -386,7 +386,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let combination = allCombinations.shift();;
                 // Next loop if the combination only contains the target village
                 if (combination.length < 2) {
-                    if (DEBUG) console.debug(`${scriptInfo} Skipping combination since there is no playervillage left: ${combination}`);
                     continue;
                 }
 
@@ -405,7 +404,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     const minCat = getMinAmountOfCatapults(village.points, fakeLimit);
                     // Considering spy amount if spySend is true,  catapult amount and if the pair is already in our results 
                     if (village.catapult >= minCat && !(spySend && village.spy <= 0) && !calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
-                        if (DEBUG) console.debug(`${scriptInfo} Found village: ${village}`);
                         chosenVillage = village;
                         break;
                     }
@@ -421,7 +419,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
 
                 calculatedFakePairs.push([chosenVillage, combination[0]]);
-                if (DEBUG) console.debug(`${scriptInfo} Added fake pair: ${[chosenVillage, combination[0]]}`);
 
                 usedPlayerVillages[chosenVillage] += 1;
                 // Accounting for spy decrement when spySend is true
@@ -430,7 +427,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
 
                 if ((spySend && chosenVillage.spy < 1) || chosenVillage.catapult < minCat) {
-                    if (DEBUG) console.debug(`${scriptInfo} Removing village: ${chosenVillage}`);
                     // loop through allCombinations and remove the chosenVillage from all its occurrences
                     allCombinations = allCombinations.map(combination => {
                         return combination.filter(element => element !== chosenVillage);
@@ -448,10 +444,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
             }
 
-            if (DEBUG) console.debug(`${scriptInfo} All generated links: ${generatedFakeLinks}`);
+            if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks}`);
             // Get end timestamp
             let endTime = new Date().getTime();
-            if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate.`);
+            if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${startingAmountOfComb} possible combinations.`);
+            createSendButtons(generatedFakeLinks);
+            if (DEBUG) console.debug(`${scriptInfo} Finished`);
 
             return;
         }
@@ -572,50 +570,47 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
-        // TODO finish cleaning up and completing html/css
-        // Helper: Create send buttons
-        function createSendButtons(createdSendLinks, nrSplit) {
-            let numberOfButtons = Math.ceil(createdSendLinks.length / nrSplit);
-            let msDelay = parseInt(document.getElementById('delay_tabs').value);
+        function createSendButtons(URIs) {
+            // Get the number of attacks per button
+            let nrSplit = parseInt(localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON);
+            if (DEBUG) console.debug(`${scriptInfo} Number of attacks per button: ${nrSplit}`);
 
-            msDelay = Number.isNaN(msDelay) == true || msDelay < 200 ? 200 : msDelay;
-            for (let i = 0; i < numberOfButtons; i++) {
-                let buttonLowerFakeNumber = i * nrSplit;
-                let buttonUpperFakeNumber = i * nrSplit + nrSplit;
+            // Fetch the 'open_tabs' div where buttons will be appended
+            let openTabsDiv = document.getElementById("open_tabs");
 
-                if (i * nrSplit + nrSplit > createdSendLinks.length) {
-                    buttonUpperFakeNumber = createdSendLinks.length;
-                }
+            // Calculate the number of required buttons
+            let nrButtons = Math.ceil(URIs.length / nrSplit);
+            if (DEBUG) console.debug(`${scriptInfo} Required number of buttons: ${nrButtons}`);
 
-                let sendButton = document.createElement('button');
-                sendButton.classList = 'btn evt-confirm-btn btn-confirm-yes open_tab';
-                sendButton.innerText = '[ ' + buttonLowerFakeNumber + ' - ' + buttonUpperFakeNumber + ' ]';
-                sendButton.style.margin = '5px';
 
-                sendButton.onclick = function () {
-                    let createdSendLinksForThisButton = createdSendLinks.slice(buttonLowerFakeNumber, buttonUpperFakeNumber);
-                    sendButton.classList.remove('evt-confirm-btn');
+            // Create and append buttons
+            for (let i = 0; i < nrButtons; i++) {
+                let button = document.createElement('button');
+                // Add CSS classes to the button
+                button.classList.add('btn', 'btn-confirm-yes');
+
+                let start = i * nrSplit + 1; // calculate starting index for display
+                let end = Math.min(URIs.length, start + nrSplit - 1); // calculate ending index, don't exceed total URIs
+
+                // Label for the button
+                button.textContent = `Open Tabs ${start}-${end}`;
+
+                // Add a click event listener to each button
+                button.addEventListener('click', function () {
+                    // Set button to grey after it's clicked
                     sendButton.classList.remove('btn-confirm-yes');
                     sendButton.classList.add('btn-confirm-no');
+                    // Open each link in new tab
+                    URIs.slice(start - 1, end).forEach((link, index) => {  // adjust start for zero-based index
+                        setTimeout(() => { window.open(link) }, index * 400);
+                    })
+                });
 
-                    for (let j = 0; j < createdSendLinksForThisButton.length; j++) {
-                        window.setTimeout(() => {
-                            window.open(createdSendLinksForThisButton[j], '_blank');
-                            if (DEBUG) {
-                                console.debug(`${scriptInfo} Current time: `, new Date().getTime());
-                            }
-                        }, msDelay * j);
-                    }
-
-                    $('.open_tab').prop('disabled', true);
-                    window.setTimeout(() => {
-                        $('.open_tab').prop('disabled', false);
-                    }, msDelay * (buttonUpperFakeNumber - buttonLowerFakeNumber));
-
-                }
-
-                document.getElementById('div_open_tabs').appendChild(sendButton);
+                // Append button to 'open_tabs' div
+                openTabsDiv.appendChild(button);
             }
+            // Make the 'open_tabs' div visible
+            openTabsDiv.style.display = "block";
         }
 
         // Helper: Render groups select

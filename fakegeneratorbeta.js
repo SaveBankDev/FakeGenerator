@@ -382,7 +382,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             //Initializing map to count the usage of each playerVillage
             let usedPlayerVillages = new Map();
             playerVillages.forEach((village) => {
-                usedPlayerVillages.set(JSON.stringify(village), 0);
+                usedPlayerVillages.set(village.villageId, 0);
             });
 
             //Creating an empty array to store resulting pairs
@@ -402,16 +402,17 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 // Sort player villages if there are more than 2 player villages for this targetCoord
                 if (combination.slice(1).length > 1) {
                     combination.slice(1).sort((a, b) => {
-                        let stringifiedA = JSON.stringify(a);
-                        let stringifiedB = JSON.stringify(b);
+                        let villageIdA = a.villageId;
+                        let villageIdB = b.villageId;
 
-                        let countA = counts.get(stringifiedA) || 0;
-                        let countB = counts.get(stringifiedB) || 0;
+                        // The villages might not exist in counts
+                        let countA = counts.get(villageIdA) || 0;
+                        let countB = counts.get(villageIdB) || 0;
 
                         if (countA !== countB) {
                             return countA - countB;
                         } else {
-                            return usedPlayerVillages.get(stringifiedA) - usedPlayerVillages.get(stringifiedB);
+                            return usedPlayerVillages.get(villageIdA) - usedPlayerVillages.get(villageIdB);
                         }
                     });
                 }
@@ -439,8 +440,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 calculatedFakePairs.push([chosenVillage, combination[0]]);
 
                 // Increment the used counter of the village we just used
-                let stringifiedChosenVillage = JSON.stringify(chosenVillage);
-                usedPlayerVillages.set(stringifiedChosenVillage, usedPlayerVillages.get(stringifiedChosenVillage) + 1);
+                usedPlayerVillages.set(chosenVillage.villageId, usedPlayerVillages.get(villageId) + 1);
 
                 // Accounting for spy decrement when spySend is true
                 if (spySend && chosenVillage.spy > 0) {
@@ -466,6 +466,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks}`);
+            if (DEBUG) console.debug(`${scriptInfo} How often each village was used: ${usedPlayerVillages}`);
             // Get end timestamp
             let endTime = new Date().getTime();
             if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${amountOfCombinations} possible combinations.`);
@@ -546,13 +547,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             array.forEach((subArray) => {
                 subArray.slice(1).forEach((object) => {
-                    let objKey = JSON.stringify(object);
+                    let villageId = object.villageId;  // Renamed variable
 
-                    if (!counts.has(objKey)) {
-                        counts.set(objKey, 1);
+                    if (!counts.has(villageId)) {
+                        counts.set(villageId, 1);
                     } else {
-                        let updatedCount = counts.get(objKey);
-                        counts.set(objKey, updatedCount + 1);
+                        let updatedCount = counts.get(villageId);
+                        counts.set(villageId, updatedCount + 1);
                     }
                 });
             });

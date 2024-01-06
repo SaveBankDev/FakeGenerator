@@ -239,19 +239,19 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             });
             // For the Attacks per Button Option
             let attacksPerButton = localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKS_PER_BUTTON;
-            attacksPerButton = (parseInt(attacksPerButton) >= MIN_ATTACKS_PER_BUTTON) ? attacksPerButton : DEFAULT_ATTACKS_PER_BUTTON;
+            attacksPerButton = (parseInt(attacksPerButton) >= MIN_ATTACKS_PER_BUTTON) ? attacksPerButton : MIN_ATTACKS_PER_BUTTON;
 
             localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, attacksPerButton)
             jQuery('#raAttPerBut').val(attacksPerButton)
 
             jQuery('#raAttPerBut').on('change', function (e) {
                 e.target.value = e.target.value.replace(/\D/g, '')
+                if (e.target.value < 1 || isNaN(parseInt(e.target.value)) || parseInt(e.target.value) < MIN_ATTACKS_PER_BUTTON) {
+                    jQuery('#raAttPerBut').val(MIN_ATTACKS_PER_BUTTON);
+                    e.target.value = MIN_ATTACKS_PER_BUTTON;
+                }
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Attacks per Button: `, e.target.value);
-                }
-                if (e.target.value < 1 || isNaN(parseInt(e.target.value)) || parseInt(e.target.value) < MIN_ATTACKS_PER_BUTTON) {
-                    jQuery('#raAttPerBut').val(DEFAULT_ATTACKS_PER_BUTTON);
-                    e.target.value = DEFAULT_ATTACKS_PER_BUTTON;
                 }
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, e.target.value);
             });

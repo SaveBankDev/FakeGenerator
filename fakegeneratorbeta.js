@@ -14,7 +14,7 @@
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
-if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 10; // 10 minutes before Night bonus to give players time to send the attacks
+if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 10 minutes before Night bonus to give players time to send the attacks
 
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
@@ -119,6 +119,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
         const villageData = villageArrayToDict(villages);
 
+        // REMOVE IN LIVE
+        let usedVillageIds = new Set();
 
 
         // Entry point
@@ -326,7 +328,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     spySend = false;
                 }
                 let array = [];
+                // REMOVE IN LIVE
                 if (DEBUG) {
+                    // Moved outside to only be generated once, records all used villageIds
                     for (i = 0; i < 99; i++) {
                         array.push(generateRandomVillageObject());
                     }
@@ -398,9 +402,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (combination.length < 2) {
                     continue;
                 }
-
-                // Sort player villages if there are more than 2 player villages for this targetCoord
-                if (combination.slice(1).length > 1) {
+                // Sort player villages if there are more than 1 player village for this targetCoord
+                if (combination.length > 2) {
                     combination.slice(1).sort((a, b) => {
                         let villageIdA = a.villageId;
                         let villageIdB = b.villageId;
@@ -409,10 +412,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         let countA = counts.get(villageIdA) || 0;
                         let countB = counts.get(villageIdB) || 0;
 
-                        if (countA !== countB) {
-                            return countA - countB;
+                        // Get usage counts
+                        let usedCountA = usedPlayerVillages.get(villageIdA) || 0;
+                        let usedCountB = usedPlayerVillages.get(villageIdB) || 0;
+
+                        // Compare usedPlayerVillage values first if the difference is greater than 2. If not, then compare count values.
+                        if (Math.abs(usedCountA - usedCountB) > 2) {
+                            return usedCountA - usedCountB; // Lower usedPlayerVillage is better.
                         } else {
-                            return usedPlayerVillages.get(villageIdA) - usedPlayerVillages.get(villageIdB);
+                            return countA - countB; // Lower count is better.
                         }
                     });
                 }
@@ -466,7 +474,31 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks}`);
-            if (DEBUG) console.debug(`${scriptInfo} How often each village was used: ${usedPlayerVillages}`);
+            if (DEBUG) {
+                let villageUsages = [];
+
+                for (let villageId of usedPlayerVillages.keys()) {
+                    let usage = usedPlayerVillages.get(villageId);
+                    villageUsages.push(usage);
+                    console.debug(`${scriptInfo} How often each village was used: ${villageId} : ${usage}`);
+                }
+
+                // Calculate the median
+                villageUsages.sort((a, b) => a - b);
+
+                let median;
+                let midIndex = Math.floor(villageUsages.length / 2);
+
+                // If the quantity of the elements is even, the median is the average of the two central elements
+                // Otherwise, it's the single central element
+                if (villageUsages.length % 2 === 0) {
+                    median = (villageUsages[midIndex - 1] + villageUsages[midIndex]) / 2;
+                } else {
+                    median = villageUsages[midIndex];
+                }
+
+                console.debug(`${scriptInfo} Median usage of villages: ${median}`);
+            }
             // Get end timestamp
             let endTime = new Date().getTime();
             if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${amountOfCombinations} possible combinations.`);
@@ -498,9 +530,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     minCat = getMinAmountOfCatapults(playerVillage.points, fakeLimit);
                     // If the attack has a valid arrival time and the player village has enough catapults add it to our subArray
                     if (validArrivalTime && playerVillage.catapult >= minCat) {
+                        /*
                         if (DEBUG) console.debug(scriptInfo + " Ankunft: " +
                             new Date(currentTime + travelTime).getHours().toString().padStart(2, '0') + ":" +
                             new Date(currentTime + travelTime).getMinutes().toString().padStart(2, '0'));
+                        */
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -806,23 +840,33 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 console.error(`${scriptInfo} Error:`, error);
             }
         }
+        // REMOVE IN LIVE
+        // Helper function to generate random integer between min (inclusive) and max (exclusive)
+        function getRandomInt(min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
+        }
 
         // REMOVE IN LIVE VERSION
         function generateRandomVillageObject() {
-            // Helper function to generate random integer between min (inclusive) and max (exclusive)
-            function getRandomInt(min, max) {
-                min = Math.ceil(min);
-                max = Math.floor(max);
-                return Math.floor(Math.random() * (max - min) + min);
-            }
-
             // Generate a random coordinate string 'xxx|yyy'
-            const coord = `${getRandomInt(1, 999).toString().padStart(3, '0')}|${getRandomInt(1, 999).toString().padStart(3, '0')}`;
+            const coord = `${getRandomInt(100, 130).toString().padStart(3, '0')}|${getRandomInt(100, 130).toString().padStart(3, '0')}`;
+
+            let villageId;
+
+            // Ensure villageId is unique by generating new ones until we find one that hasn't been used
+            do {
+                villageId = getRandomInt(1, 2001);
+            } while (usedVillageIds.has(villageId));
+
+            // Record the used villageId
+            usedVillageIds.add(villageId);
 
             return {
                 archer: getRandomInt(0, 201),
                 axe: getRandomInt(0, 201),
-                catapult: getRandomInt(0, 201),
+                catapult: getRandomInt(150, 160),
                 coord: coord,
                 heavy: getRandomInt(0, 201),
                 knight: getRandomInt(0, 201),
@@ -830,12 +874,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 marcher: getRandomInt(0, 201),
                 militia: getRandomInt(0, 201),
                 ram: getRandomInt(0, 201),
-                points: getRandomInt(100, 9000),
+                points: getRandomInt(8000, 9000),
                 snob: getRandomInt(0, 201),
                 spear: getRandomInt(0, 201),
                 spy: getRandomInt(0, 201),
                 sword: getRandomInt(0, 201),
-                villageId: getRandomInt(1, 2001)
+                villageId: villageId
             };
         }
     }

@@ -262,15 +262,21 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             });
             //  For the coord input text area
             jQuery('#raCoordInput').on('change', function (e) {
+                let startTime = new Date().getTime();
+                let amountOfCoords = 0;
+                let existingCoordinates = []
                 const coordinates = this.value.match(COORD_REGEX);
                 if (coordinates) {
-                    const existingCoordinates = coordinates.filter(coord => checkIfVillageExists(coord));
+                    amountOfCoords = coordinates.length;
+                    existingCoordinates = coordinates.filter(coord => checkIfVillageExists(coord));
                     this.value = existingCoordinates.join(' ');
                     jQuery('#raCoordInput').text(existingCoordinates.length);
                 } else {
                     this.value = '';
                     jQuery('#raCoordInput').text(0);
                 }
+                let endTime = new Date().getTime();
+                if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to filter ${amountOfCoords} coords and check for their existence.\n ${scriptInfo} ${existingCoordinates.length} existing coordinates have been found.`);
             });
             // For the Calculate Fakes Button
             jQuery('#calculateFakes').on('click', async function (e) {
@@ -334,6 +340,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             catSpeed 
         */
         function calculateFakes(playerVillages, targetCoords, nightInfo, fakeLimit, catSpeed, spySend) {
+            // Get start timestamp
+            let startTime = new Date().getTime();
             let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, catSpeed, nightInfo, fakeLimit);
 
             //DEBUG information
@@ -429,6 +437,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     });
                 }
             }
+            if (DEBUG) console.debug(`${scriptInfo} Calculated fake pairs: ${calculatedFakePairs}`);
 
             let generatedFakeLinks = [];
             for (let pair of calculatedFakePairs) {
@@ -438,7 +447,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 0));
                 }
             }
+
             if (DEBUG) console.debug(`${scriptInfo} All generated links: ${generatedFakeLinks}`);
+            // Get end timestamp
+            let endTime = new Date().getTime();
+            if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate.`);
 
             return;
         }
@@ -496,7 +509,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Helper:  Get Village ID from a coordinate
         function getVillageIdFromCoord(coord) {
             let village = villageData[coord];
-            return village[1];
+            return village[0];
         }
 
         // Helper: Get village points from village.txt with coordinates

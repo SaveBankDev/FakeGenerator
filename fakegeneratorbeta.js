@@ -440,7 +440,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 calculatedFakePairs.push([chosenVillage, combination[0]]);
 
                 // Increment the used counter of the village we just used
-                usedPlayerVillages.set(chosenVillage.villageId, usedPlayerVillages.get(villageId) + 1);
+                usedPlayerVillages.set(chosenVillage.villageId, usedPlayerVillages.get(chosenVillage.villageId) + 1);
 
                 // Accounting for spy decrement when spySend is true
                 if (spySend && chosenVillage.spy > 0) {

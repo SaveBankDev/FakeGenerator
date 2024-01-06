@@ -1,3 +1,8 @@
+New features:
+- add an option for players to set delay between opening tabs (at least 250 ms)
+- add an option for players to set min
+
 Found bugs::
 - Attacks in the night bonus (probably fixed)
 - Wrong amount of catapults (probably fixed)
+- getCounts and usedPlayerVillage didnt work as intended because Javascript doesnt like saving object as keys in dictionaries (probably fixed by using maps)

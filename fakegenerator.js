@@ -40,10 +40,10 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v0.1',
+        version: 'v1.0',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
-        helpLink: '',
+        helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
     },
     translations: {
         en_DK: {
@@ -96,7 +96,6 @@ var scriptConfig = {
             'No': 'Nein',
             'No Fakes possible!': 'Keine Fakes möglich!',
             'Loading...': 'Lädt...',
-
         }
     },
     allowedMarkets: [],
@@ -579,6 +578,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             // Fetch the 'open_tabs' div where buttons will be appended
             let openTabsDiv = document.getElementById("open_tabs");
+
+            // Reset the buttons
+            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>`;
 
             // Calculate the number of required buttons
             let nrButtons = Math.ceil(URIs.length / nrSplit);

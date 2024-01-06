@@ -318,8 +318,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Player villages with points: `, playerVillages);
                 }
-
-                let spyAmount;
+                let spySend;
                 const spy = localStorage.getItem(`${scriptConfig.scriptData.prefix}_send_spy`) ?? "yes";
                 if (spy === "yes") {
                     spySend = true;
@@ -370,10 +369,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             Then subtract the used amount of catapults from the villages catapults and if the village then does not have enough catapults for more fakes, remove it from the remaining arrays
             */
 
-            //Initializing dictionary to count the usage of each playerVillage
-            let usedPlayerVillages = {};
+            //Initializing map to count the usage of each playerVillage
+            let usedPlayerVillages = new Map();
             playerVillages.forEach((village) => {
-                usedPlayerVillages[village] = 0;
+                usedPlayerVillages.set(village, 0);
             });
 
             //Creating an empty array to store resulting pairs
@@ -381,7 +380,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             // Get counts beforehand and reuse it
             let counts = getCounts(allCombinations);
-
+            let minCat;
 
             while (allCombinations.length > 0) {
                 let combination = allCombinations.shift();;
@@ -392,17 +391,20 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
                 // Sort player villages
                 combination.slice(1).sort((a, b) => {
-                    if (counts[a] !== counts[b]) {
-                        return counts[a] - counts[b];
+                    const countA = counts.get(a) || 0;
+                    const countB = counts.get(b) || 0;
+
+                    if (countA !== countB) {
+                        return countA - countB;
                     } else {
-                        return usedPlayerVillages[a] - usedPlayerVillages[b];
+                        return usedPlayerVillages.get(a) - usedPlayerVillages.get(b);
                     }
                 });
 
                 let chosenVillage = null;
                 for (let j = 1; j < combination.length; j++) {
                     let village = combination[j];
-                    const minCat = getMinAmountOfCatapults(village.points, fakeLimit);
+                    minCat = getMinAmountOfCatapults(village.points, fakeLimit);
                     // Considering spy amount if spySend is true,  catapult amount and if the pair is already in our results 
                     if (village.catapult >= minCat && !(spySend && village.spy <= 0) && !calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
                         chosenVillage = village;
@@ -415,13 +417,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     continue;
                 }
 
-                const minCat = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
+                minCat = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
                 chosenVillage.catapult -= minCat;
 
 
                 calculatedFakePairs.push([chosenVillage, combination[0]]);
 
-                usedPlayerVillages[chosenVillage] += 1;
+                // Increment the used counter of the village we just used
+                usedPlayerVillages.set(chosenVillage, usedPlayerVillages.get(chosenVillage) + 1);
+
                 // Accounting for spy decrement when spySend is true
                 if (spySend && chosenVillage.spy > 0) {
                     chosenVillage.spy -= 1;
@@ -519,16 +523,21 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Create a function to count the frequency of each value in the remaining value arrays
         function getCounts(array) {
-            let counts = {};
+            let counts = new Map();
+
             array.forEach((subArray) => {
-                subArray.slice(1).forEach((value) => {
-                    if (!counts[value]) {
-                        counts[value] = 1;
+                subArray.slice(1).forEach((object) => {
+                    let objKey = JSON.stringify(object);
+
+                    if (!counts.has(objKey)) {
+                        counts.set(objKey, 1);
                     } else {
-                        counts[value] += 1;
+                        let updatedCount = counts.get(objKey);
+                        counts.set(objKey, updatedCount + 1);
                     }
                 });
             });
+
             return counts;
         }
 

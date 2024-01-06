@@ -14,11 +14,11 @@
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
+if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 10; // 10 minutes before Night bonus to give players time to send the attacks
 
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
-var NIGHT_BONUS_OFFSET = 10;  // 10 minutes before Night bonus to give players time to send the attacks
 var MIN_ATTACKS_PER_BUTTON = 5;
 var TROOP_POP = {
     spear: 1,
@@ -568,20 +568,23 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
-        // Helper: Checks if the arrival time is not in the night bonus
+        // Helper: Checks if the arrival time is in the night bonus or not
         function checkValidArrivalTime(start_hour, end_hour, timestamp) {
             const time = new Date(timestamp);
-            const currentHour = time.getHours();
-            const currentMinutes = time.getMinutes();
+            const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
-            const checkStartNb = start_hour - (NIGHT_BONUS_OFFSET / 60); // We want to arrive shortly before the night bonus to give the player time to send the attacks
+            // We want to arrive shortly before the night bonus to give the player time to send the attacks
+            const checkStartNb = ((start_hour + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offset
             const checkEndNb = end_hour;
 
-            if (checkEndNb <= checkStartNb) {
-                return ((currentHour + currentMinutes / 60) >= checkEndNb && (currentHour + currentMinutes / 60) < checkStartNb);
-            } else {
+            // If night bonus doesnt span accross midnight
+            if (checkStartNb < checkEndNb) {
+                return (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
                 // If the nigth bonus spans across midnight
-                return ((currentHour + currentMinutes / 60) >= checkEndNb || (currentHour + currentMinutes / 60) < checkStartNb);
+            } else if (checkStartNb > checkEndNb) {
+                return (currentTotalTime >= checkEndNb || currentTotalTime < checkStartNb);
+            } else {
+                return false;
             }
         }
 

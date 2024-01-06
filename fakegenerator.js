@@ -145,9 +145,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         /* TODO UI
         User Input:
         - Tabs to open in one Button (Check if number is high enough to not have 1000 buttons)
-        Output:
-        - Number of Fakes generated / Number of total possible Fakes
-        - Buttons to open Fakes in new tab to send (Prefill troop amount: 1 Spy and min amount of Cats)
         */
         function renderUI() {
             const groupsFilter = renderGroupsFilter();
@@ -156,37 +153,37 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const content = `
         <div class="ra-fake-generator" id="raFakeGenerator">
             <h2>${twSDK.tt(scriptConfig.scriptData.name)}</h2>
-        <div class="ra-fake-generator-data">
-        <div class="ra-mb15">
-			<div class="ra-grid">
-                <div>
-                    <label>${twSDK.tt('Group')}</label>
-                    ${groupsFilter}
+            <div class="ra-fake-generator-data">
+                <div class="ra-mb15">
+                    <div class="ra-grid">
+                        <div>
+                            <label>${twSDK.tt('Group')}</label>
+                            ${groupsFilter}
+                        </div>
+                        <div>
+                            <label>${twSDK.tt('Send Spy?')}</label>
+                            ${spySelect}
+                        </div>
+                        <div class="number-input">
+                            <label>${twSDK.tt('Attacks per Button')}</label>
+                            <input id="raAttPerBut" type="number" value="${DEFAULT_ATTACKSPERBUTTON}">
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label>${twSDK.tt('Send Spy?')}</label>
-                    ${spySelect}
+                <div class="ra-mb15">
+                    <a href="javascript:void(0);" id="calculateFakes" class="btn btn-confirm-yes onclick="">
+                        ${twSDK.tt('Calculate Fakes')}
+                    </a>
                 </div>
-				<div class="number-input">
-					<label>${twSDK.tt('Attacks per Button')}</label>
-					<input id="raAttPerBut" type="number" value="${DEFAULT_ATTACKSPERBUTTON}">
-				</div>
+                <div class="ra-mb15">
+                    <textarea id="raCoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
+                </div>
             </div>
-		</div>
-		<div class="ra-mb15">
-			<a href="javascript:void(0);" id="calculateFakes" class="btn btn-confirm-yes onclick="">
-				${twSDK.tt('Calculate Fakes')}
-			</a>
-		</div>
-		    <div class="ra-mb15">
-		        <textarea id="raCoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
-		    </div>
-        </div>
-        <div>
-            <div id="open_tabs" style="display: none;" class="ra-mb15">
-                <h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>
+            <div>
+                <div id="open_tabs" style="display: none;" class="ra-mb15">
+                    <h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>
+                </div>
             </div>
-        </div>
             <small>
                 <strong>
                     ${twSDK.tt(scriptConfig.scriptData.name)} ${scriptConfig.scriptData.version}
@@ -206,11 +203,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 			.ra-fake-generator label { font-weight: 600 !important; margin-bottom: 5px; display: block; }
 			.ra-fake-generator select { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
             .ra-fake-generator input[type="number"] { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
-			.ra-fake-generator .btn-confirm-yes { padding: 3px; }
+			.ra-fake-generator .btn-confirm-yes { padding: 3px; margin: 5px; }
             .number-input { display: flex; flex-direction: column; width: 100%; }
             .number-input label { white-space: nowrap; }
             .number-input input { width: 100%; }
             .ra-mb15 { margin-bottom: 15px; }
+            .btn-confirm-clicked { background: #666 !important; }
 
 			${mobiledevice ? '.ra-fake-generator { margin: 5px; border-radius: 10px; } .ra-fake-generator h2 { margin: 0 0 10px 0; font-size: 18px; } .ra-fake-generator .ra-grid { grid-template-columns: 1fr } .ra-fake-generator .ra-grid > div { margin-bottom: 15px; } .ra-fake-generator .btn { margin-bottom: 8px; margin-right: 8px; } .ra-fake-generator select { height: auto; } .ra-fake-generator input[type="text"] { height: auto; } .ra-hide-on-mobile { display: none; }' : '.ra-fake-generator .ra-grid { display: grid; grid-template-columns: 150px 1fr 100px 150px 150px; grid-gap: 0 20px; }'}
 
@@ -239,14 +237,18 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_chosen_group`, e.target.value);
             });
             // For the Attacks per Button Option
-            localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON)
-            jQuery('#raAttPerBut').val(localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON)
+            let attacksPerButton = localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON;
+            attacksPerButton = (parseInt(attacksPerButton) >= MIN_ATTACKS_PER_BUTTON) ? attacksPerButton : DEFAULT_ATTACKSPERBUTTON;
+
+            localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, attacksPerButton)
+            jQuery('#raAttPerBut').val(attacksPerButton)
+
             jQuery('#raAttPerBut').on('change', function (e) {
                 e.target.value = e.target.value.replace(/\D/g, '')
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Attacks per Button: `, e.target.value);
                 }
-                if (e.target.value < 1 || isNaN(parseInt(e.target.value))) {
+                if (e.target.value < 1 || isNaN(parseInt(e.target.value)) || parseInt(e.target.value) < MIN_ATTACKS_PER_BUTTON) {
                     jQuery('#raAttPerBut').val(DEFAULT_ATTACKSPERBUTTON);
                     e.target.value = DEFAULT_ATTACKSPERBUTTON;
                 }
@@ -275,7 +277,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     jQuery('#raCoordInput').text(0);
                 }
                 let endTime = new Date().getTime();
-                if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to filter ${amountOfCoords} coords and check for their existence.\n ${scriptInfo} ${existingCoordinates.length} existing coordinates have been found.`);
+                if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to filter ${amountOfCoords} coords and check for their existence.\n${scriptInfo} ${existingCoordinates.length} existing coordinates have been found.`);
             });
             // For the Calculate Fakes Button
             jQuery('#calculateFakes').on('click', async function (e) {
@@ -593,13 +595,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let end = Math.min(URIs.length, start + nrSplit - 1); // calculate ending index, don't exceed total URIs
 
                 // Label for the button
-                button.textContent = `Open Tabs ${start}-${end}`;
+                button.textContent = `[ ${start}-${end} ]`;
 
                 // Add a click event listener to each button
                 button.addEventListener('click', function () {
                     // Set button to grey after it's clicked
-                    sendButton.classList.remove('btn-confirm-yes');
-                    sendButton.classList.add('btn-confirm-no');
+                    this.classList.remove('btn-confirm-yes');
+                    this.classList.add('btn-confirm-clicked');
                     // Open each link in new tab
                     URIs.slice(start - 1, end).forEach((link, index) => {  // adjust start for zero-based index
                         setTimeout(() => { window.open(link) }, index * 400);

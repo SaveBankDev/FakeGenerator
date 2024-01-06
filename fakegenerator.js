@@ -59,6 +59,8 @@ var scriptConfig = {
             'Send Spy?': 'Send Spy?',
             'Yes': 'Yes',
             'No': 'No',
+            'No Fakes possible!': 'No Fakes possible!',
+            'Loading...': 'Loading...',
         },
         en_US: {
             'Redirecting...': 'Redirecting...',
@@ -74,6 +76,8 @@ var scriptConfig = {
             'Send Spy?': 'Send Spy?',
             'Yes': 'Yes',
             'No': 'No',
+            'No Fakes possible!': 'No Fakes possible!',
+            'Loading...': 'Loading...',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -89,6 +93,8 @@ var scriptConfig = {
             'Send Spy?': 'Späher mitschicken?',
             'Yes': 'Ja',
             'No': 'Nein',
+            'No Fakes possible!': 'Keine Fakes möglich!',
+            'Loading...': 'Lädt...',
 
         }
     },
@@ -102,12 +108,17 @@ var scriptConfig = {
 $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript.src}`,
     async function () {
         // Initialize Library
+        if (DEBUG) {
+            console.debug("INIT");
+        }
         await twSDK.init(scriptConfig);
+        UI.InfoMessage(twSDK.tt('Loading...'));
         const scriptInfo = twSDK.scriptInfo();
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');
         const groups = await fetchVillageGroups();
         const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
+        const villageData = villageArrayToDict(villages);
 
 
 
@@ -133,8 +144,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         /* TODO UI
         User Input:
-        - Target coordinates
-        - Group to send from
         - Tabs to open in one Button (Check if number is high enough to not have 1000 buttons)
         Output:
         - Number of Fakes generated / Number of total possible Fakes
@@ -170,7 +179,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 			</a>
 		</div>
 		    <div class="ra-mb15">
-		        <textarea id="coordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
+		        <textarea id="raCoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
 		    </div>
         </div>
         <div>
@@ -252,132 +261,282 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_send_spy`, e.target.value);
             });
             //  For the coord input text area
-            jQuery('#coordInput').on('change', function (e) {
+            jQuery('#raCoordInput').on('change', function (e) {
                 const coordinates = this.value.match(COORD_REGEX);
                 if (coordinates) {
-                    this.value = coordinates.join(' ');
-                    jQuery('#coordInput').text(coordinates.length);
+                    const existingCoordinates = coordinates.filter(coord => checkIfVillageExists(coord));
+                    this.value = existingCoordinates.join(' ');
+                    jQuery('#raCoordInput').text(existingCoordinates.length);
                 } else {
                     this.value = '';
-                    jQuery('#coordInput').text(0);
+                    jQuery('#raCoordInput').text(0);
                 }
             });
             // For the Calculate Fakes Button
             jQuery('#calculateFakes').on('click', async function (e) {
                 e.preventDefault();
 
-                let player_villages;
-                let target_coords = [];
+                let playerVillages;
+                let targetCoords = [];
 
-                target_coords = jQuery('#coordInput').val().trim().match(COORD_REGEX);
-                if (target_coords.length === 0) {
+                targetCoords = jQuery('#raCoordInput').val().trim().match(COORD_REGEX) ?? [];
+                if (targetCoords.length === 0) {
                     UI.ErrorMessage(twSDK.tt('No target coordinates!'));
                     return;
                 }
                 const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
 
                 if (DEBUG) {
-                    console.debug(`${scriptInfo} Target coordinates: `, target_coords);
+                    console.debug(`${scriptInfo} Target coordinates: `, targetCoords);
                     console.debug(`${scriptInfo} worldConfig: `, worldConfig);
                     console.debug(`${scriptInfo} worldUnitInfo: `, worldUnitInfo);
                     console.debug(`${scriptInfo} village.txt villages: `, villages); // Risky
+                    console.debug(`${scriptInfo} Current URL: `, getCurrentURL());
                 }
 
                 try {
-                    player_villages = await fetchTroopsForCurrentGroup(parseInt(groupId));
+                    playerVillages = await fetchTroopsForCurrentGroup(parseInt(groupId));
                     if (DEBUG) {
-                        console.debug(`${scriptInfo} Player villages: `, player_villages);
+                        console.debug(`${scriptInfo} Player villages: `, playerVillages);
                     }
                 } catch (error) {
                     UI.ErrorMessage(twSDK.tt('There was an error!'));
                     console.error(`${scriptInfo} Error:`, error);
                 }
 
-                for (player_village of player_villages) {
-                    points = getVillagePoints(player_village.villageId)
-                    player_village.points = points;
+                for (let playerVillage of playerVillages) {
+                    points = getVillagePointsFromCoord(playerVillage.coord)
+                    playerVillage.points = points;
                 }
 
                 if (DEBUG) {
-                    console.debug(`${scriptInfo} Player villages with points: `, player_villages);
+                    console.debug(`${scriptInfo} Player villages with points: `, playerVillages);
                 }
 
+                let spyAmount;
+                const spy = localStorage.getItem(`${scriptConfig.scriptData.prefix}_send_spy`) ?? "yes";
+                if (spy === "yes") {
+                    spySend = true;
+                } else {
+                    spySend = false;
+                }
 
-                calculateFakes(player_villages, target_coords, worldConfig.config.night, parseInt(worldConfig.config.unit_speed), parseInt(worldConfig.config.speed),
-                    parseInt(worldConfig.config.game.fake_limit), parseInt(worldUnitInfo.config.catapult.speed));
+                calculateFakes(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
 
             });
         }
 
         /*  Main calculation function
             Input:
-            player_villages
-            target_coords
-            world_config (unitSpeed, worldSpeed, night[active, start_hour, end_hour], fake_limit)
-            cat_speed 
-
-            Calculation:
-            TODO 
+            playerVillages
+            targetCoords
+            world_config (night[active, start_hour, end_hour], fakeLimit)
+            catSpeed 
         */
-        function calculateFakes(player_villages, target_coords, night_info, unit_speed, world_speed, fake_limit, cat_speed) {
+        function calculateFakes(playerVillages, targetCoords, nightInfo, fakeLimit, catSpeed, spySend) {
+            let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, catSpeed, nightInfo, fakeLimit);
 
-            const actual_cat_speed = cat_speed * (unit_speed * world_speed);
-            allCombinations = getAllPossibleCombinations(player_villages, target_coords, actual_cat_speed, night_info, fake_limit);
+            //DEBUG information
             if (DEBUG) {
                 console.debug(`${scriptInfo} All calculated Combinations: `, allCombinations);
+                console.debug(`${scriptInfo} Amount of possible Combinations: `, amountOfCombinations);
+            }
+            if (amountOfCombinations === 0) {
+                UI.ErrorMessage(twSDK.tt('No Fakes possible!'));
+                return;
             }
 
+            //Filter arrays less than 1 in length, meaning only containing the target village
+            if (DEBUG) console.debug(`${scriptInfo} Initial length of allCombinations: ${allCombinations.length}`);
+            allCombinations = allCombinations.filter((combination) => combination.length > 1);
+            if (DEBUG) console.debug(`${scriptInfo} Final length of allCombinations: ${allCombinations.length}`);
+
+            /*
+            Filter Coordinates where no player villages has been found
+            Sort the array in ascending order of value length
+            Iterate over the found combinations in the array
+            If we have multiple player villages, get the one that is least often used for other future target coords and has been used the least
+            and push the coord combination to our result
+            If only one Player village has been found, just use that 
+            Then subtract the used amount of catapults from the villages catapults and if the village then does not have enough catapults for more fakes, remove it from the remaining arrays
+            */
+
+            //Initializing dictionary to count the usage of each playerVillage
+            let usedPlayerVillages = {};
+            playerVillages.forEach((village) => {
+                usedPlayerVillages[village] = 0;
+            });
+
+            //Creating an empty array to store resulting pairs
+            let calculatedFakePairs = [];
+
+            // Get counts beforehand and reuse it
+            let counts = getCounts(allCombinations);
 
 
+            while (allCombinations.length > 0) {
+                let combination = allCombinations.shift();;
+                // Next loop if the combination only contains the target village
+                if (combination.length < 2) {
+                    if (DEBUG) console.debug(`${scriptInfo} Skipping combination since there is no playervillage left: ${combination}`);
+                    continue;
+                }
+
+                // Sort player villages
+                combination.slice(1).sort((a, b) => {
+                    if (counts[a] !== counts[b]) {
+                        return counts[a] - counts[b];
+                    } else {
+                        return usedPlayerVillages[a] - usedPlayerVillages[b];
+                    }
+                });
+
+                let chosenVillage = null;
+                for (let j = 1; j < combination.length; j++) {
+                    let village = combination[j];
+                    const minCat = getMinAmountOfCatapults(village.points, fakeLimit);
+                    // Considering spy amount if spySend is true,  catapult amount and if the pair is already in our results 
+                    if (village.catapult >= minCat && !(spySend && village.spy <= 0) && !calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
+                        if (DEBUG) console.debug(`${scriptInfo} Found village: ${village}`);
+                        chosenVillage = village;
+                        break;
+                    }
+                }
+
+                // If no valid village is found, skip to the next combination
+                if (!chosenVillage) {
+                    continue;
+                }
+
+                const minCat = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
+                chosenVillage.catapult -= minCat;
+
+
+                calculatedFakePairs.push([chosenVillage, combination[0]]);
+                if (DEBUG) console.debug(`${scriptInfo} Added fake pair: ${[chosenVillage, combination[0]]}`);
+
+                usedPlayerVillages[chosenVillage] += 1;
+                // Accounting for spy decrement when spySend is true
+                if (spySend && chosenVillage.spy > 0) {
+                    chosenVillage.spy -= 1;
+                }
+
+                if ((spySend && chosenVillage.spy < 1) || chosenVillage.catapult < minCat) {
+                    if (DEBUG) console.debug(`${scriptInfo} Removing village: ${chosenVillage}`);
+                    // loop through allCombinations and remove the chosenVillage from all its occurrences
+                    allCombinations = allCombinations.map(combination => {
+                        return combination.filter(element => element !== chosenVillage);
+                    });
+                }
+            }
+
+            let generatedFakeLinks = [];
+            for (let pair of calculatedFakePairs) {
+                if (spySend) {
+                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 1));
+                } else {
+                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 0));
+                }
+            }
+            if (DEBUG) console.debug(`${scriptInfo} All generated links: ${generatedFakeLinks}`);
 
             return;
         }
 
+
         // All possible combinations of player village and target  coords with consideration of arrival time outside the night bonus and minimum catapult am
-        function getAllPossibleCombinations(player_villages, target_coords, unit_speed, night_info, fake_limit) {
-            let result = {};
-            let current_time = Date.now();
-            let minCat = 0;
+        function getAllPossibleCombinations(playerVillages, targetCoords, unitSpeed, nightInfo, fakeLimit) {
+            let allCombinations = [];
+            let currentTime = Date.now();
+            let minCat = 1;
             let validArrivalTime = false;
-            for (let target_coord of target_coords) {
-                result[target_coord] = [];
-                for (let player_village of player_villages) {
-                    distance = twSDK.calculateDistance(player_village.coord, target_coord);
-                    travel_time = twSDK.getTravelTimeInSecond(distance, unit_speed) * 1000;
+            let amountOfCombinations = 0;
+            let distance;
+            let travelTime;
+
+            for (let targetCoord of targetCoords) {
+                let subArray = [targetCoord];
+                for (let playerVillage of playerVillages) {
+                    distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
+                    travelTime = twSDK.getTravelTimeInSecond(distance, unitSpeed) * 1000;
                     // Check if arrival time would be in night bonus
-                    validArrivalTime = checkValidArrivalTime(parseInt(night_info.start_hour), parseInt(night_info.end_hour), (current_time + travel_time))
+                    validArrivalTime = checkValidArrivalTime(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))
                     // Check the minimum amount of needed catapults 
-                    minCat = getMinAmountOfCatapults(player_village.points, fake_limit);
-                    // If the attack has a valid arrival time and the player village has enough catapults add it to our result 
-                    if (validArrivalTime && player_village.catapult >= minCat) {
-                        result[target_coord] = result[target_coord].push(player_village);
+                    minCat = getMinAmountOfCatapults(playerVillage.points, fakeLimit);
+                    // If the attack has a valid arrival time and the player village has enough catapults add it to our subArray
+                    if (validArrivalTime && playerVillage.catapult >= minCat) {
+                        subArray.push(playerVillage);
+                        amountOfCombinations += 1;
                     }
                 }
+                allCombinations.push(subArray);
             }
-            return result;
+            return { amountOfCombinations, allCombinations };
         }
 
-        // Helper: Get village points from village.txt with villageId
-        function getVillagePoints(villageId) {
-            for (village of villages) {
-                // If we find the matching villageId in the village.txt we return the points of the village
-                if (villageId === village[0]) {
-                    if (DEBUG) {
-                        console.debug(`${scriptInfo} Found matching villageIds: `, villageId, village[0]);
+        // Helper: Function to generate a link from villageIds 
+        // 'https://de219.die-staemme.de/game.php?village=48766&screen=place&spy=1&catapult=14&x=472&y=523&
+        function generateLink(village1, villageId2, catAmount, spyAmount) {
+            completeLink = ""
+            completeLink += getCurrentURL();
+            completeLink += `?village=${village1.villageId}&screen=place&target=${villageId2}&spy=${spyAmount}&catapult=${catAmount}`;
+            return completeLink;
+        }
+
+        // Helper: Villages array to dictionary, to quickly search with coordinates
+        function villageArrayToDict(villageArray) {
+            let dict = {};
+            for (let i = 0; i < villageArray.length; i++) {
+                let key = villageArray[i][2] + '|' + villageArray[i][3]; //assuming x is at arr[i][2] and y is at arr[i][3]
+                dict[key] = [villageArray[i][0], villageArray[i][5]];   //assuming id is at arr[i][0] and points is at arr[i][5]
+            }
+            return dict;
+        }
+
+        // Helper:  Get Village ID from a coordinate
+        function getVillageIdFromCoord(coord) {
+            let village = villageData[coord];
+            return village[1];
+        }
+
+        // Helper: Get village points from village.txt with coordinates
+        function getVillagePointsFromCoord(coord) {
+            let village = villageData[coord];
+            return village[1];
+        }
+
+        // Helper: Create a function to count the frequency of each value in the remaining value arrays
+        function getCounts(array) {
+            let counts = {};
+            array.forEach((subArray) => {
+                subArray.slice(1).forEach((value) => {
+                    if (!counts[value]) {
+                        counts[value] = 1;
+                    } else {
+                        counts[value] += 1;
                     }
-                    return village[5];
-                }
-            }
-            return 0; // This should never happen
+                });
+            });
+            return counts;
         }
 
-        // Helper: Get minimum amount of catapults to send depending on if fake_limit is active
-        function getMinAmountOfCatapults(player_village_points, fake_limit) {
-            if (fake_limit === 0) {
+        // Helper: Check if coord exists as village
+        function checkIfVillageExists(coord) {
+            return coord in villageData;
+        }
+
+        //  Helper: Get current URL
+        function getCurrentURL() {
+            return window.location.protocol + "//" + window.location.host + window.location.pathname;;
+        }
+
+        // Helper: Get minimum amount of catapults to send depending on if fakeLimit is active
+        function getMinAmountOfCatapults(playerVillagePoints, fakeLimit) {
+            if (fakeLimit === 0) {
                 return 1;
             } else {
                 // Get the required amount of pop and calculate the next higher amount of catapults to meet the demand
-                req_catapults = Math.floor(((player_village_points * (fake_limit / 100)) + (TROOP_POP.catapult - 1)) / TROOP_POP.catapult);
+                req_catapults = Math.floor(((playerVillagePoints * (fakeLimit / 100)) + (TROOP_POP.catapult - 1)) / TROOP_POP.catapult);
                 // If the required catapult amount is 0 we still need at least 1 to send a fake
                 return (req_catapults > 0) ? req_catapults : 1;
             }
@@ -389,60 +548,60 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const currentHour = time.getHours();
             const currentMinutes = time.getMinutes();
 
-            const check_start_nb = start_hour - (NIGHT_BONUS_OFFSET / 60); // We want to arrive shortly before the night bonus to give the player time to send the attacks
-            const check_end_nb = end_hour;
+            const checkStartNb = start_hour - (NIGHT_BONUS_OFFSET / 60); // We want to arrive shortly before the night bonus to give the player time to send the attacks
+            const checkEndNb = end_hour;
 
-            if (check_end_nb <= check_start_nb) {
-                return ((currentHour + currentMinutes / 60) >= check_end_nb && (currentHour + currentMinutes / 60) < check_start_nb);
+            if (checkEndNb <= checkStartNb) {
+                return ((currentHour + currentMinutes / 60) >= checkEndNb && (currentHour + currentMinutes / 60) < checkStartNb);
             } else {
                 // If the nigth bonus spans across midnight
-                return ((currentHour + currentMinutes / 60) >= check_end_nb || (currentHour + currentMinutes / 60) < check_start_nb);
+                return ((currentHour + currentMinutes / 60) >= checkEndNb || (currentHour + currentMinutes / 60) < checkStartNb);
             }
         }
 
         // TODO finish cleaning up and completing html/css
         // Helper: Create send buttons
-        function createSendButtons(created_send_links, nr_split) {
-            let number_of_buttons = Math.ceil(created_send_links.length / nr_split);
-            let ms_delay = parseInt(document.getElementById('delay_tabs').value);
+        function createSendButtons(createdSendLinks, nrSplit) {
+            let numberOfButtons = Math.ceil(createdSendLinks.length / nrSplit);
+            let msDelay = parseInt(document.getElementById('delay_tabs').value);
 
-            ms_delay = Number.isNaN(ms_delay) == true || ms_delay < 200 ? 200 : ms_delay;
-            for (let i = 0; i < number_of_buttons; i++) {
-                let button_lower_fake_number = i * nr_split;
-                let button_upper_fake_number = i * nr_split + nr_split;
+            msDelay = Number.isNaN(msDelay) == true || msDelay < 200 ? 200 : msDelay;
+            for (let i = 0; i < numberOfButtons; i++) {
+                let buttonLowerFakeNumber = i * nrSplit;
+                let buttonUpperFakeNumber = i * nrSplit + nrSplit;
 
-                if (i * nr_split + nr_split > created_send_links.length) {
-                    button_upper_fake_number = created_send_links.length;
+                if (i * nrSplit + nrSplit > createdSendLinks.length) {
+                    buttonUpperFakeNumber = createdSendLinks.length;
                 }
 
-                let send_button = document.createElement('button');
-                send_button.classList = 'btn evt-confirm-btn btn-confirm-yes open_tab';
-                send_button.innerText = '[ ' + button_lower_fake_number + ' - ' + button_upper_fake_number + ' ]';
-                send_button.style.margin = '5px';
+                let sendButton = document.createElement('button');
+                sendButton.classList = 'btn evt-confirm-btn btn-confirm-yes open_tab';
+                sendButton.innerText = '[ ' + buttonLowerFakeNumber + ' - ' + buttonUpperFakeNumber + ' ]';
+                sendButton.style.margin = '5px';
 
-                send_button.onclick = function () {
-                    let created_send_links_for_this_button = created_send_links.slice(button_lower_fake_number, button_upper_fake_number);
-                    send_button.classList.remove('evt-confirm-btn');
-                    send_button.classList.remove('btn-confirm-yes');
-                    send_button.classList.add('btn-confirm-no');
+                sendButton.onclick = function () {
+                    let createdSendLinksForThisButton = createdSendLinks.slice(buttonLowerFakeNumber, buttonUpperFakeNumber);
+                    sendButton.classList.remove('evt-confirm-btn');
+                    sendButton.classList.remove('btn-confirm-yes');
+                    sendButton.classList.add('btn-confirm-no');
 
-                    for (let j = 0; j < created_send_links_for_this_button.length; j++) {
+                    for (let j = 0; j < createdSendLinksForThisButton.length; j++) {
                         window.setTimeout(() => {
-                            window.open(created_send_links_for_this_button[j], '_blank');
+                            window.open(createdSendLinksForThisButton[j], '_blank');
                             if (DEBUG) {
                                 console.debug(`${scriptInfo} Current time: `, new Date().getTime());
                             }
-                        }, ms_delay * j);
+                        }, msDelay * j);
                     }
 
                     $('.open_tab').prop('disabled', true);
                     window.setTimeout(() => {
                         $('.open_tab').prop('disabled', false);
-                    }, ms_delay * (button_upper_fake_number - button_lower_fake_number));
+                    }, msDelay * (buttonUpperFakeNumber - buttonLowerFakeNumber));
 
                 }
 
-                document.getElementById('div_open_tabs').appendChild(send_button);
+                document.getElementById('div_open_tabs').appendChild(sendButton);
             }
         }
 

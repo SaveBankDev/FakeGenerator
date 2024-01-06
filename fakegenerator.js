@@ -14,11 +14,11 @@
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
+if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 10 minutes before Night bonus to give players time to send the attacks
 
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
-var NIGHT_BONUS_OFFSET = 10;  // 10 minutes before Night bonus to give players time to send the attacks
 var MIN_ATTACKS_PER_BUTTON = 5;
 var TROOP_POP = {
     spear: 1,
@@ -327,7 +327,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
 
                 calculateFakes(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
-
             });
         }
 
@@ -372,7 +371,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             //Initializing map to count the usage of each playerVillage
             let usedPlayerVillages = new Map();
             playerVillages.forEach((village) => {
-                usedPlayerVillages.set(village, 0);
+                usedPlayerVillages.set(village.villageId, 0);
             });
 
             //Creating an empty array to store resulting pairs
@@ -388,18 +387,28 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (combination.length < 2) {
                     continue;
                 }
+                // Sort player villages if there are more than 1 player village for this targetCoord
+                if (combination.length > 2) {
+                    combination.slice(1).sort((a, b) => {
+                        let villageIdA = a.villageId;
+                        let villageIdB = b.villageId;
 
-                // Sort player villages
-                combination.slice(1).sort((a, b) => {
-                    const countA = counts.get(a) || 0;
-                    const countB = counts.get(b) || 0;
+                        // The villages might not exist in counts
+                        let countA = counts.get(villageIdA) || 0;
+                        let countB = counts.get(villageIdB) || 0;
 
-                    if (countA !== countB) {
-                        return countA - countB;
-                    } else {
-                        return usedPlayerVillages.get(a) - usedPlayerVillages.get(b);
-                    }
-                });
+                        // Get usage counts
+                        let usedCountA = usedPlayerVillages.get(villageIdA) || 0;
+                        let usedCountB = usedPlayerVillages.get(villageIdB) || 0;
+
+                        // Compare usedPlayerVillage values first if the difference is greater than 2. If not, then compare count values.
+                        if (Math.abs(usedCountA - usedCountB) > 2) {
+                            return usedCountA - usedCountB; // Lower usedPlayerVillage is better.
+                        } else {
+                            return countA - countB; // Lower count is better.
+                        }
+                    });
+                }
 
                 let chosenVillage = null;
                 for (let j = 1; j < combination.length; j++) {
@@ -424,7 +433,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 calculatedFakePairs.push([chosenVillage, combination[0]]);
 
                 // Increment the used counter of the village we just used
-                usedPlayerVillages.set(chosenVillage, usedPlayerVillages.get(chosenVillage) + 1);
+                usedPlayerVillages.set(chosenVillage.villageId, usedPlayerVillages.get(chosenVillage.villageId) + 1);
 
                 // Accounting for spy decrement when spySend is true
                 if (spySend && chosenVillage.spy > 0) {
@@ -452,7 +461,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks}`);
             // Get end timestamp
             let endTime = new Date().getTime();
-            if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${startingAmountOfComb} possible combinations.`);
+            if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${amountOfCombinations} possible combinations.`);
             createSendButtons(generatedFakeLinks);
             if (DEBUG) console.debug(`${scriptInfo} Finished`);
 
@@ -527,13 +536,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             array.forEach((subArray) => {
                 subArray.slice(1).forEach((object) => {
-                    let objKey = JSON.stringify(object);
+                    let villageId = object.villageId;  // Renamed variable
 
-                    if (!counts.has(objKey)) {
-                        counts.set(objKey, 1);
+                    if (!counts.has(villageId)) {
+                        counts.set(villageId, 1);
                     } else {
-                        let updatedCount = counts.get(objKey);
-                        counts.set(objKey, updatedCount + 1);
+                        let updatedCount = counts.get(villageId);
+                        counts.set(villageId, updatedCount + 1);
                     }
                 });
             });
@@ -564,20 +573,20 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
-        // Helper: Checks if the arrival time is not in the night bonus
+        // Helper: Checks if the arrival time is in the night bonus or not
         function checkValidArrivalTime(start_hour, end_hour, timestamp) {
             const time = new Date(timestamp);
-            const currentHour = time.getHours();
-            const currentMinutes = time.getMinutes();
+            const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
-            const checkStartNb = start_hour - (NIGHT_BONUS_OFFSET / 60); // We want to arrive shortly before the night bonus to give the player time to send the attacks
+            // We want to arrive shortly before the night bonus to give the player time to send the attacks
+            const checkStartNb = ((start_hour + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
             const checkEndNb = end_hour;
 
-            if (checkEndNb <= checkStartNb) {
-                return ((currentHour + currentMinutes / 60) >= checkEndNb && (currentHour + currentMinutes / 60) < checkStartNb);
+            // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
+            if (start_hour === end_hour) {
+                return false; // edge case where start and end time are the same
             } else {
-                // If the nigth bonus spans across midnight
-                return ((currentHour + currentMinutes / 60) >= checkEndNb || (currentHour + currentMinutes / 60) < checkStartNb);
+                return (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
             }
         }
 

@@ -16,9 +16,10 @@ if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
 
 // Global variable
-var DEFAULT_ATTACKSPERBUTTON = 20;
+var DEFAULT_ATTACKS_PER_BUTTON = 20;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
 var NIGHT_BONUS_OFFSET = 5 * 60 * 1000;  // 5 minutes before Night bonus to give players time to send the attacks
+var MIN_ATTACKS_PER_BUTTON = 5;
 var TROOP_POP = {
     spear: 1,
     sword: 1,
@@ -166,7 +167,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         </div>
                         <div class="number-input">
                             <label>${twSDK.tt('Attacks per Button')}</label>
-                            <input id="raAttPerBut" type="number" value="${DEFAULT_ATTACKSPERBUTTON}">
+                            <input id="raAttPerBut" type="number" value="${DEFAULT_ATTACKS_PER_BUTTON}">
                         </div>
                     </div>
                 </div>
@@ -237,8 +238,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_chosen_group`, e.target.value);
             });
             // For the Attacks per Button Option
-            let attacksPerButton = localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON;
-            attacksPerButton = (parseInt(attacksPerButton) >= MIN_ATTACKS_PER_BUTTON) ? attacksPerButton : DEFAULT_ATTACKSPERBUTTON;
+            let attacksPerButton = localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKS_PER_BUTTON;
+            attacksPerButton = (parseInt(attacksPerButton) >= MIN_ATTACKS_PER_BUTTON) ? attacksPerButton : DEFAULT_ATTACKS_PER_BUTTON;
 
             localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, attacksPerButton)
             jQuery('#raAttPerBut').val(attacksPerButton)
@@ -249,8 +250,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     console.debug(`${scriptInfo} Attacks per Button: `, e.target.value);
                 }
                 if (e.target.value < 1 || isNaN(parseInt(e.target.value)) || parseInt(e.target.value) < MIN_ATTACKS_PER_BUTTON) {
-                    jQuery('#raAttPerBut').val(DEFAULT_ATTACKSPERBUTTON);
-                    e.target.value = DEFAULT_ATTACKSPERBUTTON;
+                    jQuery('#raAttPerBut').val(DEFAULT_ATTACKS_PER_BUTTON);
+                    e.target.value = DEFAULT_ATTACKS_PER_BUTTON;
                 }
                 localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, e.target.value);
             });
@@ -574,7 +575,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         function createSendButtons(URIs) {
             // Get the number of attacks per button
-            let nrSplit = parseInt(localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKSPERBUTTON);
+            let nrSplit = parseInt(localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKS_PER_BUTTON);
             if (DEBUG) console.debug(`${scriptInfo} Number of attacks per button: ${nrSplit}`);
 
             // Fetch the 'open_tabs' div where buttons will be appended

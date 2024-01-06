@@ -574,17 +574,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
             // We want to arrive shortly before the night bonus to give the player time to send the attacks
-            const checkStartNb = ((start_hour + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offset
+            const checkStartNb = ((start_hour + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
             const checkEndNb = end_hour;
 
-            // If night bonus doesnt span accross midnight
-            if (checkStartNb < checkEndNb) {
-                return (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
-                // If the nigth bonus spans across midnight
-            } else if (checkStartNb > checkEndNb) {
-                return (currentTotalTime >= checkEndNb || currentTotalTime < checkStartNb);
+            // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
+            if (start_hour === end_hour) {
+                return false; // edge case where start and end time are the same
             } else {
-                return false;
+                return (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
             }
         }
 

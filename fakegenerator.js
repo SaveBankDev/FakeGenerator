@@ -115,6 +115,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const scriptInfo = twSDK.scriptInfo();
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');
+        // Check that we are on the correct screen and mode
+        if (!isValidScreen && !isValidMode) {
+            // Redirect to correct screen if necessary
+            UI.InfoMessage(twSDK.tt('Redirecting...'));
+            twSDK.redirectTo('overview_villages&combined');
+            return;
+        }
         const groups = await fetchVillageGroups();
         const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
         const villageData = villageArrayToDict(villages);
@@ -124,15 +131,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Entry point
         (async function () {
             try {
-                // Check that we are on the correct screen and mode
-                if (!isValidScreen && !isValidMode) {
-                    // Redirect to correct screen if necessary
-                    UI.InfoMessage(twSDK.tt('Redirecting...'));
-                    twSDK.redirectTo('overview_villages&combined');
-                } else {
-                    renderUI();
-                    addEventHandlers();
-                }
+                renderUI();
+                addEventHandlers();
             } catch (error) {
                 UI.ErrorMessage(twSDK.tt('There was an error!'));
                 console.error(`${scriptInfo} Error:`, error);

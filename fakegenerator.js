@@ -1,7 +1,7 @@
-/* javascript:$.getScript('https://dl.dropboxusercontent.com/scl/fi/nsgrlm82n8iv3sl3uj0i2/fakegenerator.js?rlkey=6iyvpi8kwrnv1q3y0aq3j0l34&dl=0');
+/* 
 * Script Name: Fake Generator
-* Version: v0.1
-* Last Updated: 2024-01-02
+* Version: v1.0
+* Last Updated: 2024-01-06
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -42,7 +42,7 @@ var scriptConfig = {
         name: 'Fake Generator',
         version: 'v0.1',
         author: 'SaveBank',
-        authorUrl: '',
+        authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: '',
     },
     translations: {
@@ -113,7 +113,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             console.debug("INIT");
         }
         await twSDK.init(scriptConfig);
-        UI.InfoMessage(twSDK.tt('Loading...'));
         const scriptInfo = twSDK.scriptInfo();
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');

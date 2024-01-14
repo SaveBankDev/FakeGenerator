@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
 * Version: v1.0.1
-* Last Updated: 2024-01-06
+* Last Updated: 2024-01-14
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -19,7 +19,7 @@ if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 10 minut
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
-var MIN_ATTACKS_PER_BUTTON = 5;
+var MIN_ATTACKS_PER_BUTTON = 1;
 var TROOP_POP = {
     spear: 1,
     sword: 1,
@@ -116,6 +116,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');
         // Check that we are on the correct screen and mode
+        // I think we need to do it this early to avoid await fetchWorldConfigData() from being interupted by the redirection
+        // Some players had the issue that their indexedDb was empty after loading the script and this might fix it
         if (!isValidScreen && !isValidMode) {
             // Redirect to correct screen if necessary
             UI.InfoMessage(twSDK.tt('Redirecting...'));
@@ -141,10 +143,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
 
 
-        /* TODO UI
-        User Input:
-        - Tabs to open in one Button (Check if number is high enough to not have 1000 buttons)
-        */
         function renderUI() {
             const groupsFilter = renderGroupsFilter();
             const spySelect = renderSpySelect();

@@ -25,7 +25,7 @@ New features:
 - target_coordinates (array of strings)
 
 - dynamic/manuell unit input
-- fix copied bug in fetchTroopsForCurrentGroup
+- fix copied bug in fetchTroopsForCurrentGroup (done)
 - script usage counter?
 
 Things i have to change to UI for:

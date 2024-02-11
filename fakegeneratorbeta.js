@@ -73,7 +73,7 @@ var scriptConfig = {
             'Keep Catapults': 'Keep Catapults',
             'Enter units to send': 'Enter units to send',
             'Enter units to keep': 'Enter units to keep',
-            'Coordinates:': 'Coordinates:',
+            'Coordinates': 'Coordinates',
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
 
@@ -102,7 +102,7 @@ var scriptConfig = {
             'Keep Catapults': 'Keep Catapults',
             'Enter units to send': 'Enter units to send',
             'Enter units to keep': 'Enter units to keep',
-            'Coordinates:': 'Coordinates:',
+            'Coordinates': 'Coordinates',
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
         },
@@ -130,7 +130,7 @@ var scriptConfig = {
             'Keep Catapults': 'Katapulte zurückhalten',
             'Enter units to send': 'Zu sendende Truppen eingeben',
             'Enter units to keep': 'Zu behaltende Truppen eingeben',
-            'Coordinates:': 'Koordinaten',
+            'Coordinates': 'Koordinaten',
             'Delete all arrival times': 'Alle Ankunftszeiten löschen',
             'Arrival time': 'Ankunftszeiten'
         }
@@ -227,7 +227,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 </div>
                 <div class="ra-mb10">
                     <fieldset class="sb-fieldset">
-                        <legend>${twSDK.tt('Coordinates:')}</legend>
+                        <legend id="coordinates">${twSDK.tt('Coordinates')}:</legend>
                         <textarea id="CoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
                     </fieldset>
                 </div>
@@ -284,7 +284,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     font-size: 14px;
                     border: 1px solid #c1a264;
                     border-radius: 3px;
-                    width: 80px;
+                    width: 70px;
                 }
                 .ra-table th img {
                     display: block;
@@ -510,7 +510,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
 
                 // Ensure the input is at least 0
-                const inputValue = parseInt(e.target.value) >= 0 ? parseInt(e.target.value) : 0;
+                const inputValue = parseInt(e.target.value) >= -1 ? parseInt(e.target.value) : 0;
 
                 jQuery(`#${e.target.id}`).val(inputValue);
 
@@ -527,6 +527,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
 
             let target_coords = getLocalStorage().target_coordinates;
+            if (target_coords && target_coords.length > 0) {
+                jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}: ${target_coords.length}`);
+            }
             jQuery('#CoordInput').val(target_coords.join(' '));
             // For the coord input text area
             jQuery('#CoordInput').on('change', function (e) {
@@ -538,10 +541,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     amountOfCoords = coordinates.length;
                     existingCoordinates = coordinates.filter(coord => checkIfVillageExists(coord));
                     this.value = existingCoordinates.join(' ');
-                    jQuery('#CoordInput').text(existingCoordinates.length);
+                    jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}: ${existingCoordinates.length}`);
                 } else {
                     this.value = '';
-                    jQuery('#CoordInput').text(0);
+                    jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}:`);
                 }
                 let endTime = new Date().getTime();
                 if (DEBUG) {
@@ -562,6 +565,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 localStorageObject.arrival_times = [];
                 saveLocalStorage(localStorageObject);
             });
+            initializeSavedEntries()
             jQuery('#addTimeEntry').on('click', async function (e) {
                 e.preventDefault();
 
@@ -575,8 +579,16 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     const endTime = new Date(endTimeString).getTime();
 
                     if (!isNaN(startTime) && !isNaN(endTime) && startTime < endTime && currentTime < endTime) {
-                        // Valid entry, proceed to update localStorage
+                        // Check if the combination of timestamps is already saved
                         const localStorageObject = getLocalStorage();
+                        const isDuplicate = localStorageObject.arrival_times.some(timeSpan => isEqual(timeSpan, [startTime, endTime]));
+
+                        if (isDuplicate) {
+                            // Entry already exists, do nothing and return
+                            console.log('Entry already exists.');
+                            return;
+                        }
+                        // Valid entry, proceed to update localStorage
                         localStorageObject.arrival_times.push([startTime, endTime]);
                         saveLocalStorage(localStorageObject);
 
@@ -1132,8 +1144,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const units = game_data.units;
             let contentManualUnitSelection = "";
             const unitsToIgnore = ['militia', 'knight', 'snob'];
-            let unitTableSend = buildUnitsPicker(game_data.units, unitsToIgnore, "send", 'number');
-            let unitTableKeep = buildUnitsPicker(game_data.units, unitsToIgnore, "keep", 'number');
+            let unitTableSend = buildUnitsPicker(unitsToIgnore, "send", 'number');
+            let unitTableKeep = buildUnitsPicker(unitsToIgnore, "keep", 'number');
 
 
             contentManualUnitSelection = `
@@ -1213,7 +1225,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             objTroops[item.name] = item.value;
                         }
                         );
-                        objTroops.coord = twSDK.getCoordFromString(coord);
+                        objTroops.coord = getLastMatch(coord);
                         objTroops.villageId = villageId;
 
                         homeTroops.push(objTroops);
@@ -1272,6 +1284,49 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return troopsForGroup;
         }
 
+        // Function to initialize date and time entries from local storage
+        function initializeSavedEntries() {
+            const localStorageObject = getLocalStorage();
+            const arrivalTimes = localStorageObject.arrival_times;
+
+            if (arrivalTimes && arrivalTimes.length > 0) {
+                // Iterate through saved arrival times and create entries
+                for (const timeSpan of arrivalTimes) {
+                    const startTime = new Date(timeSpan[0]).toLocaleString(); // Convert timestamp to locale format
+                    const endTime = new Date(timeSpan[1]).toLocaleString(); // Convert timestamp to locale format
+
+                    // Create a new entry div
+                    const newEntryDiv = jQuery('<div class="sb-grid sb-grid-5 sb-arrival-time"></div>');
+                    newEntryDiv.append(`<div>${startTime}</div>`);
+                    newEntryDiv.append(`<div>${endTime}</div>`);
+                    newEntryDiv.append('<div class="delete-entry-btn">X</div>');
+                    newEntryDiv.append('<div></div>'); // Empty div
+                    newEntryDiv.append('<div></div>'); // Empty div
+                    jQuery('#arrivalTimeFieldset').append(newEntryDiv);
+
+                    // Event handler for the delete entry button
+                    newEntryDiv.find('.delete-entry-btn').on('click', function () {
+                        newEntryDiv.remove();
+                        const updatedLocalStorage = getLocalStorage();
+                        updatedLocalStorage.arrival_times = updatedLocalStorage.arrival_times.filter(savedTimeSpan => !isEqual(savedTimeSpan, timeSpan));
+                        saveLocalStorage(updatedLocalStorage);
+                    });
+                }
+            }
+        }
+
+        function getLastMatch(inputString) {
+            const regex = COORD_REGEX;
+            let lastMatch = null;
+            let match;
+
+            while ((match = regex.exec(inputString)) !== null) {
+                lastMatch = match[0];
+            }
+
+            return lastMatch;
+        }
+
         // Service: Function to get settings from localStorage
         function getLocalStorage() {
             const localStorageSettings = localStorage.getItem('sbFakegeneratorSettings');
@@ -1328,7 +1383,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Copied and edited from twSDK to be able to call it twice and get different IDs
         // Please implement into SDK somehow
-        function buildUnitsPicker(selectedUnits, unitsToIgnore, id_prefix, type = 'checkbox') {
+        function buildUnitsPicker(unitsToIgnore, id_prefix, type = 'checkbox') {
             let unitsTable = ``;
 
             let thUnits = ``;
@@ -1336,10 +1391,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             game_data.units.forEach((unit) => {
                 if (!unitsToIgnore.includes(unit)) {
-                    let checked = '';
-                    if (selectedUnits.includes(unit) && type == "checkbox") {
-                        checked = `checked`;
-                    }
 
                     thUnits += `
                         <th class="ra-text-center">
@@ -1351,7 +1402,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
                     tableRow += `
                         <td class="ra-text-center">
-                            <input name="ra_chosen_units" type="${type}" ${checked} id="${id_prefix}_unit_${unit}" class="ra-unit-selector" value="${unit}" />
+                            <input name="ra_chosen_units" type="${type}" id="${id_prefix}_unit_${unit}" class="ra-unit-selector" value="0" />
                         </td>
                     `;
                 }

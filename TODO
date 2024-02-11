@@ -2,7 +2,70 @@ New features:
 - add an option for players to set delay between opening tabs (at least 250 ms)
 - add an option for players to set min
 
-Found bugs::
-- Attacks in the night bonus (probably fixed)
-- Wrong amount of catapults (probably fixed)
-- getCounts and usedPlayerVillage didnt work as intended because Javascript doesnt like saving object as keys in dictionaries (probably fixed by using maps)
+
+
+
+
+
+
+
+
+                let array = [];
+                // REMOVE IN LIVE
+                if (DEBUG) {
+                    // Moved outside to only be generated once, records all used villageIds
+                    for (i = 0; i < 99; i++) {
+                        array.push(generateRandomVillageObject());
+                    }
+                    calculateFakes(array, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
+
+                } else {
+                    calculateFakes(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
+
+                }
+
+        // REMOVE IN LIVE
+        let usedVillageIds = new Set();
+
+        // REMOVE IN LIVE
+        // Helper function to generate random integer between min (inclusive) and max (exclusive)
+        function getRandomInt(min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
+        }
+
+        // REMOVE IN LIVE VERSION
+        function generateRandomVillageObject() {
+            // Generate a random coordinate string 'xxx|yyy'
+            const coord = `${getRandomInt(100, 130).toString().padStart(3, '0')}|${getRandomInt(100, 130).toString().padStart(3, '0')}`;
+
+            let villageId;
+
+            // Ensure villageId is unique by generating new ones until we find one that hasn't been used
+            do {
+                villageId = getRandomInt(1, 2001);
+            } while (usedVillageIds.has(villageId));
+
+            // Record the used villageId
+            usedVillageIds.add(villageId);
+
+            return {
+                archer: getRandomInt(0, 201),
+                axe: getRandomInt(0, 201),
+                catapult: getRandomInt(150, 160),
+                coord: coord,
+                heavy: getRandomInt(0, 201),
+                knight: getRandomInt(0, 201),
+                light: getRandomInt(0, 201),
+                marcher: getRandomInt(0, 201),
+                militia: getRandomInt(0, 201),
+                ram: getRandomInt(0, 201),
+                points: getRandomInt(8000, 9000),
+                snob: getRandomInt(0, 201),
+                spear: getRandomInt(0, 201),
+                spy: getRandomInt(0, 201),
+                sword: getRandomInt(0, 201),
+                villageId: villageId
+            };
+        }

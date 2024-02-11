@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
 * Version: v1.0.1
-* Last Updated: 2024-01-06
+* Last Updated: 2024-01-14
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -19,7 +19,7 @@ if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 10 minut
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
-var MIN_ATTACKS_PER_BUTTON = 5;
+var MIN_ATTACKS_PER_BUTTON = 1;
 var TROOP_POP = {
     spear: 1,
     sword: 1,
@@ -115,26 +115,26 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const scriptInfo = twSDK.scriptInfo();
         const isValidScreen = twSDK.checkValidLocation('screen');
         const isValidMode = twSDK.checkValidLocation('mode');
+        // Check that we are on the correct screen and mode
+        // I think we need to do it this early to avoid await fetchWorldConfigData() from being interupted by the redirection
+        // Some players had the issue that their indexedDb was empty after loading the script and this might fix it
+        if (!isValidScreen && !isValidMode) {
+            // Redirect to correct screen if necessary
+            UI.InfoMessage(twSDK.tt('Redirecting...'));
+            twSDK.redirectTo('overview_villages&combined');
+            return;
+        }
         const groups = await fetchVillageGroups();
         const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
         const villageData = villageArrayToDict(villages);
 
-        // REMOVE IN LIVE
-        let usedVillageIds = new Set();
 
 
         // Entry point
         (async function () {
             try {
-                // Check that we are on the correct screen and mode
-                if (!isValidScreen && !isValidMode) {
-                    // Redirect to correct screen if necessary
-                    UI.InfoMessage(twSDK.tt('Redirecting...'));
-                    twSDK.redirectTo('overview_villages&combined');
-                } else {
-                    renderUI();
-                    addEventHandlers();
-                }
+                renderUI();
+                addEventHandlers();
             } catch (error) {
                 UI.ErrorMessage(twSDK.tt('There was an error!'));
                 console.error(`${scriptInfo} Error:`, error);
@@ -142,11 +142,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         })();
 
 
-
-        /* TODO UI
-        User Input:
-        - Tabs to open in one Button (Check if number is high enough to not have 1000 buttons)
-        */
         function renderUI() {
             const groupsFilter = renderGroupsFilter();
             const spySelect = renderSpySelect();
@@ -327,21 +322,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 } else {
                     spySend = false;
                 }
-                let array = [];
-                // REMOVE IN LIVE
-                if (DEBUG) {
-                    // Moved outside to only be generated once, records all used villageIds
-                    for (i = 0; i < 99; i++) {
-                        array.push(generateRandomVillageObject());
-                    }
-                    calculateFakes(array, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
 
-                } else {
-                    calculateFakes(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
-
-                }
-
-
+                calculateFakes(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
             });
         }
 
@@ -370,6 +352,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             //Filter arrays less than 1 in length, meaning only containing the target village
             if (DEBUG) console.debug(`${scriptInfo} Unfiltered length of allCombinations: ${allCombinations.length}`);
             allCombinations = allCombinations.filter((combination) => combination.length > 1);
+            // Sort allCombinations array based on the length of sub-arrays in ascending order
+            allCombinations.sort((a, b) => a.length - b.length);
             let startingAmountOfComb = allCombinations.length;
             if (DEBUG) console.debug(`${scriptInfo} Filtered length of allCombinations: ${startingAmountOfComb}`);
 
@@ -395,6 +379,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             // Get counts beforehand and reuse it
             let counts = getCounts(allCombinations);
             let minCat;
+            const threshold = 0.10; // 10% threshold
 
             while (allCombinations.length > 0) {
                 let combination = allCombinations.shift();;
@@ -402,9 +387,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (combination.length < 2) {
                     continue;
                 }
+
                 // Sort player villages if there are more than 1 player village for this targetCoord
                 if (combination.length > 2) {
-                    combination.slice(1).sort((a, b) => {
+                    combination = [combination[0]].concat(combination.slice(1).sort((a, b) => {
                         let villageIdA = a.villageId;
                         let villageIdB = b.villageId;
 
@@ -416,13 +402,20 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         let usedCountA = usedPlayerVillages.get(villageIdA) || 0;
                         let usedCountB = usedPlayerVillages.get(villageIdB) || 0;
 
-                        // Compare usedPlayerVillage values first if the difference is greater than 2. If not, then compare count values.
-                        if (Math.abs(usedCountA - usedCountB) > 2) {
+                        // The number of remaining targets
+                        let remainingTargets = allCombinations.length;
+
+                        // Compare usedPlayerVillage values if:
+                        // - Both counts are greater than the number of remaining targets
+                        // - The absolute difference between usedCounts is greater than 2
+                        // - And both counts are greater than 2
+                        if (((countA > remainingTargets * threshold && countB > remainingTargets * threshold) || Math.abs(usedCountA - usedCountB) > 1) && countA > 2 && countB > 2 && usedCountA != usedCountB) {
                             return usedCountA - usedCountB; // Lower usedPlayerVillage is better.
                         } else {
+                            // If not, then compare count values.
                             return countA - countB; // Lower count is better.
                         }
-                    });
+                    }));
                 }
 
                 let chosenVillage = null;
@@ -450,6 +443,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 // Increment the used counter of the village we just used
                 usedPlayerVillages.set(chosenVillage.villageId, usedPlayerVillages.get(chosenVillage.villageId) + 1);
 
+                // Update counts for all villages in the chosen combination
+                combination.slice(1).forEach((playerVillage) => {
+                    let villageId = playerVillage.villageId;
+
+                    if (counts.has(villageId)) {
+                        counts.set(villageId, counts.get(villageId) - 1);
+                    }
+                });
+
                 // Accounting for spy decrement when spySend is true
                 if (spySend && chosenVillage.spy > 0) {
                     chosenVillage.spy -= 1;
@@ -463,17 +465,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
             }
             if (DEBUG) console.debug(`${scriptInfo} Calculated fake pairs: ${calculatedFakePairs}`);
-
-            let generatedFakeLinks = [];
-            for (let pair of calculatedFakePairs) {
-                if (spySend) {
-                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 1));
-                } else {
-                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 0));
-                }
-            }
-
-            if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks}`);
             if (DEBUG) {
                 let villageUsages = [];
 
@@ -497,8 +488,19 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     median = villageUsages[midIndex];
                 }
 
+                console.debug(`${scriptInfo} Sorted usages ${villageUsages}`);
                 console.debug(`${scriptInfo} Median usage of villages: ${median}`);
             }
+            let generatedFakeLinks = [];
+            for (let pair of calculatedFakePairs) {
+                if (spySend) {
+                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 1));
+                } else {
+                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 0));
+                }
+            }
+
+            if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks}`);
             // Get end timestamp
             let endTime = new Date().getTime();
             if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${amountOfCombinations} possible combinations.`);
@@ -530,11 +532,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     minCat = getMinAmountOfCatapults(playerVillage.points, fakeLimit);
                     // If the attack has a valid arrival time and the player village has enough catapults add it to our subArray
                     if (validArrivalTime && playerVillage.catapult >= minCat) {
-                        /*
-                        if (DEBUG) console.debug(scriptInfo + " Ankunft: " +
-                            new Date(currentTime + travelTime).getHours().toString().padStart(2, '0') + ":" +
-                            new Date(currentTime + travelTime).getMinutes().toString().padStart(2, '0'));
-                        */
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -839,48 +836,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 );
                 console.error(`${scriptInfo} Error:`, error);
             }
-        }
-        // REMOVE IN LIVE
-        // Helper function to generate random integer between min (inclusive) and max (exclusive)
-        function getRandomInt(min, max) {
-            min = Math.ceil(min);
-            max = Math.floor(max);
-            return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
-        }
-
-        // REMOVE IN LIVE VERSION
-        function generateRandomVillageObject() {
-            // Generate a random coordinate string 'xxx|yyy'
-            const coord = `${getRandomInt(100, 130).toString().padStart(3, '0')}|${getRandomInt(100, 130).toString().padStart(3, '0')}`;
-
-            let villageId;
-
-            // Ensure villageId is unique by generating new ones until we find one that hasn't been used
-            do {
-                villageId = getRandomInt(1, 2001);
-            } while (usedVillageIds.has(villageId));
-
-            // Record the used villageId
-            usedVillageIds.add(villageId);
-
-            return {
-                archer: getRandomInt(0, 201),
-                axe: getRandomInt(0, 201),
-                catapult: getRandomInt(150, 160),
-                coord: coord,
-                heavy: getRandomInt(0, 201),
-                knight: getRandomInt(0, 201),
-                light: getRandomInt(0, 201),
-                marcher: getRandomInt(0, 201),
-                militia: getRandomInt(0, 201),
-                ram: getRandomInt(0, 201),
-                points: getRandomInt(8000, 9000),
-                snob: getRandomInt(0, 201),
-                spear: getRandomInt(0, 201),
-                spy: getRandomInt(0, 201),
-                sword: getRandomInt(0, 201),
-                villageId: villageId
-            };
         }
     }
 );

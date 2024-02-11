@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
 * Version: v1.0.1
-* Last Updated: 2024-01-14
+* Last Updated: 2024-01-06
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -142,6 +142,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         })();
 
 
+
+        /* TODO UI
+        User Input:
+        - Tabs to open in one Button (Check if number is high enough to not have 1000 buttons)
+        */
         function renderUI() {
             const groupsFilter = renderGroupsFilter();
             const spySelect = renderSpySelect();

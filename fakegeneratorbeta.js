@@ -18,8 +18,11 @@ if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 10 minut
 
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
+var DEFAULT_DELAY = 250;
+var DEFAULT_MAX_ATTACKS_PER_VILLAGE = 0;
 var COORD_REGEX = (BIG_SERVER) ? /\d{1,3}\|\d{1,3}/g : /\d\d\d\|\d\d\d/g; // Different regex depending on player input if the server is too big for the strict regex
 var MIN_ATTACKS_PER_BUTTON = 1;
+var MIN_DELAY = 200;
 var TROOP_POP = {
     spear: 1,
     sword: 1,
@@ -62,6 +65,18 @@ var scriptConfig = {
             'No': 'No',
             'No Fakes possible!': 'No Fakes possible!',
             'Loading...': 'Loading...',
+            'Delay when opening tabs (in ms)': 'Delay when opening tabs (in ms)',
+            'Max Attacks per Village (0 ignores this setting)': 'Max Attacks per Village (0 ignores this setting)',
+            'dynamically': 'Dynamically',
+            'manually': 'Manually',
+            'Unit selection': 'Unit selection',
+            'Keep Catapults': 'Keep Catapults',
+            'Enter units to send': 'Enter units to send',
+            'Enter units to keep': 'Enter units to keep',
+            'Coordinates:': 'Coordinates:',
+            'Delete all arrival times': 'Delete all arrival times',
+            'Arrival time': 'Arrival time',
+
         },
         en_US: {
             'Redirecting...': 'Redirecting...',
@@ -79,6 +94,17 @@ var scriptConfig = {
             'No': 'No',
             'No Fakes possible!': 'No Fakes possible!',
             'Loading...': 'Loading...',
+            'Delay when opening tabs (in ms)': 'Delay when opening tabs (in ms)',
+            'Max Attacks per Village (0 ignores this setting)': 'Max Attacks per Village (0 ignores this setting)',
+            'dynamically': 'Dynamically',
+            'manually': 'Manually',
+            'Unit selection': 'Unit selection',
+            'Keep Catapults': 'Keep Catapults',
+            'Enter units to send': 'Enter units to send',
+            'Enter units to keep': 'Enter units to keep',
+            'Coordinates:': 'Coordinates:',
+            'Delete all arrival times': 'Delete all arrival times',
+            'Arrival time': 'Arrival time',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -96,6 +122,17 @@ var scriptConfig = {
             'No': 'Nein',
             'No Fakes possible!': 'Keine Fakes möglich!',
             'Loading...': 'Lädt...',
+            'Delay when opening tabs (in ms)': 'Verzögerung beim Tab öffnen (in ms)',
+            'Max Attacks per Village (0 ignores this setting)': 'Max Angriffe aus einem Dorf (0 ignoriert diese Einstellung)',
+            'dynamically': 'Dynamisch',
+            'manually': 'Manuell',
+            'Unit selection': 'Truppenauswahl',
+            'Keep Catapults': 'Katapulte zurückhalten',
+            'Enter units to send': 'Zu sendende Truppen eingeben',
+            'Enter units to keep': 'Zu behaltende Truppen eingeben',
+            'Coordinates:': 'Koordinaten',
+            'Delete all arrival times': 'Alle Ankunftszeiten löschen',
+            'Arrival time': 'Ankunftszeiten'
         }
     },
     allowedMarkets: [],
@@ -144,136 +181,429 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         function renderUI() {
             const groupsFilter = renderGroupsFilter();
-            const spySelect = renderSpySelect();
+            const unitSelectionType = renderUnitSelectionType();
+            const dynamicUnitSelection = renderDynamicUnitSelection();
+            const manualUnitSelection = renderManualUnitSelection();
+            const arrivalTimeSelector = renderArrivalTimeSelector();
 
             const content = `
-        <div class="ra-fake-generator" id="raFakeGenerator">
-            <h2>${twSDK.tt(scriptConfig.scriptData.name)}</h2>
-            <div class="ra-fake-generator-data">
-                <div class="ra-mb15">
-                    <div class="ra-grid">
-                        <div>
-                            <label>${twSDK.tt('Group')}</label>
+            <div class="fake-generator-data">
+                <div class="ra-mb10">
+                    <div class="sb-grid sb-grid-3">
+                        <fieldset class="sb-fieldset">
+                            <legend>${twSDK.tt('Group')}</legend>
                             ${groupsFilter}
-                        </div>
-                        <div>
-                            <label>${twSDK.tt('Send Spy?')}</label>
-                            ${spySelect}
-                        </div>
-                        <div class="number-input">
-                            <label>${twSDK.tt('Attacks per Button')}</label>
-                            <input id="raAttPerBut" type="number" value="${DEFAULT_ATTACKS_PER_BUTTON}">
-                        </div>
+                        </fieldset>
+                        <fieldset class="sb-fieldset">
+                            <legend>${twSDK.tt('Attacks per Button')}</legend>
+                            <input id="AttPerBut" type="number" value="${DEFAULT_ATTACKS_PER_BUTTON}">
+                        </fieldset>
+                        <fieldset class="sb-fieldset">
+                            <legend>${twSDK.tt('Delay when opening tabs (in ms)')}</legend>
+                            <input id="DelayTab" type="number" value="${DEFAULT_DELAY}">
+                        </fieldset>
                     </div>
                 </div>
-                <div class="ra-mb15">
+                <div class="ra-mb10">
+                    <div class="sb-grid sb-grid-2">
+                        <fieldset class="sb-fieldset">
+                            <legend>${twSDK.tt('Unit selection')}</legend>
+                            ${unitSelectionType}
+                        </fieldset>
+                        <fieldset class="sb-fieldset">
+                            <legend>${twSDK.tt('Max Attacks per Village (0 ignores this setting)')}</legend>
+                            <input id="MaxAttPerVil" type="number" value="${DEFAULT_MAX_ATTACKS_PER_VILLAGE}">
+                        </fieldset>
+                    </div>
+                </div>
+                <div>
+                    ${dynamicUnitSelection}
+                </div>
+                <div>
+                    ${manualUnitSelection}
+                </div>
+                <div class="ra-mb10">
+                    ${arrivalTimeSelector}
+                </div>
+                <div class="ra-mb10">
+                    <fieldset class="sb-fieldset">
+                        <legend>${twSDK.tt('Coordinates:')}</legend>
+                        <textarea id="CoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
+                    </fieldset>
+                </div>
+                <div class="ra-mb10">
                     <a href="javascript:void(0);" id="calculateFakes" class="btn btn-confirm-yes onclick="">
                         ${twSDK.tt('Calculate Fakes')}
                     </a>
                 </div>
-                <div class="ra-mb15">
-                    <textarea id="raCoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
-                </div>
             </div>
             <div>
-                <div id="open_tabs" style="display: none;" class="ra-mb15">
+                <div id="open_tabs" style="display: none;" class="ra-mb10">
                     <h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>
                 </div>
-            </div>
-            <small>
-                <strong>
-                    ${twSDK.tt(scriptConfig.scriptData.name)} ${scriptConfig.scriptData.version}
-                </strong> -
-                <a href="${scriptConfig.scriptData.authorUrl}" target="_blank" rel="noreferrer noopener">
-                    ${scriptConfig.scriptData.author}
-                </a> -
-                <a href="${scriptConfig.scriptData.helpLink}" target="_blank" rel="noreferrer noopener">
-                    ${twSDK.tt('Help')}
-                </a>
-            </small>
-        </div>
-        <style>
-            .ra-fake-generator { position: relative; display: block; width: auto; height: auto; clear: both; margin: 0 auto 15px; padding: 10px; border: 1px solid #603000; box-sizing: border-box; background: #f4e4bc; }
-			.ra-fake-generator * { box-sizing: border-box; }
-			.ra-fake-generator input[type="text"] { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
-			.ra-fake-generator label { font-weight: 600 !important; margin-bottom: 5px; display: block; }
-			.ra-fake-generator select { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
-            .ra-fake-generator input[type="number"] { width: 100%; padding: 5px 10px; border: 1px solid #000; font-size: 16px; line-height: 1; }
-			.ra-fake-generator .btn-confirm-yes { padding: 3px; margin: 5px; }
-            .number-input { display: flex; flex-direction: column; width: 100%; }
-            .number-input label { white-space: nowrap; }
-            .number-input input { width: 100%; }
-            .ra-mb15 { margin-bottom: 15px; }
-            .btn-confirm-clicked { background: #666 !important; }
-
-			${mobiledevice ? '.ra-fake-generator { margin: 5px; border-radius: 10px; } .ra-fake-generator h2 { margin: 0 0 10px 0; font-size: 18px; } .ra-fake-generator .ra-grid { grid-template-columns: 1fr } .ra-fake-generator .ra-grid > div { margin-bottom: 15px; } .ra-fake-generator .btn { margin-bottom: 8px; margin-right: 8px; } .ra-fake-generator select { height: auto; } .ra-fake-generator input[type="text"] { height: auto; } .ra-hide-on-mobile { display: none; }' : '.ra-fake-generator .ra-grid { display: grid; grid-template-columns: 150px 1fr 100px 150px 150px; grid-gap: 0 20px; }'}
-
-
-        </style>
-    `;
-
-            if (jQuery('.ra-fake-generator').length < 1) {
-                if (mobiledevice) {
-                    jQuery('#mobileContent').prepend(content);
-                } else {
-                    jQuery('#contentContainer').prepend(content);
+            </div>`;
+            const style = `
+            <style>
+                .fake-generator .btn-confirm-yes { padding: 3px; margin: 5px; }
+                .btn-confirm-clicked { background: #666 !important; }
+                .ra-textarea::placeholder {
+                    font-size: 15px; 
+                    font-style: italic; 
                 }
-            } else {
-                jQuery('.ra-fake-generator-data').html(content);
-            }
+                .sb-grid {
+                    display: grid;
+                    grid-gap: 10px;
+                }
+                .sb-grid-5 {
+                    grid-template-columns: repeat(5, 1fr);
+                }
+                .sb-grid-3 {
+                    grid-template-columns: repeat(3, 1fr);
+                }
+                .sb-grid-2 {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+                .sb-fieldset {
+                    border: 1px solid #c1a264;
+                    border-radius: 4px;
+                    padding: 10px;
+                }
+                .sb-fieldset legend {
+                    font-size: 12px; 
+                    font-weight: bold; 
+                }
+                .sb-fieldset select {
+                    padding: 8px;
+                    font-size: 14px;
+                    border: 1px solid #c1a264;
+                    border-radius: 3px;
+                    width: 165px;
+                }
+                .sb-fieldset input[type="number"] {
+                    padding: 8px;
+                    font-size: 14px;
+                    border: 1px solid #c1a264;
+                    border-radius: 3px;
+                    width: 80px;
+                }
+                .ra-table th img {
+                    display: block;
+                    margin: 0 auto;
+                }
+                input[type="datetime-local"] {
+                    padding: 10px;
+                    font-size: 13px; 
+                    border: 1px solid #c1a264;
+                    border-radius: 3px;
+                }
+                .sb-grid-item-text {
+                    font-size: 16px; 
+                    text-align: center; 
+                    line-height: 34px; 
+                }
+                .add-entry-btn {
+                    padding: 10px;
+                    font-size: 14px;
+                    color: white;
+                    background: #0bac00;
+                    background: linear-gradient(to bottom, #0bac00 0%,#0e7a1e 100%);
+                    border: 1px solid;
+                    border-color: #006712;
+                    border-radius: 3px;
+                    cursor: pointer;
+                }
+                .add-entry-btn:hover {
+                    background: #13c600;
+                    background: linear-gradient(to bottom, #13c600 0%,#129e23 100%);
+                }
+                .delete-entry-btn {
+                    cursor: pointer;
+                    color: red; 
+                    font-weight: bold; 
+                }
+                
+                .delete-entry-btn:hover {
+                    text-decoration: underline; 
+                }
+                .sb-arrival-time {
+                    background-color: #fff5da;
+                    border: 1px solid #c1a264; 
+                    border-radius: 4px; 
+                    padding: 10px; 
+                    display: grid;
+                    grid-column-gap: 10px; 
+                    align-items: center; 
+                }
+                #deleteAllEntries {
+                    background: #af281d;
+                    background: linear-gradient(to bottom, #af281d 0%,#801006 100%);
+                }
+                #deleteAllEntries:hover {
+                    background: #c92722;
+                    background: linear-gradient(to bottom, #c92722 0%,#a00d08 100%);
+                }
+            </style>`;
+
+            twSDK.renderBoxWidget(
+                content,
+                'FakeGenerator',
+                'fake-generator',
+                style
+            );
         }
 
-        // Add event handlers and data storage
+        // Add event handlers and data storage and value initialization
         function addEventHandlers() {
             // For the Group select menu
-            jQuery('#raGroupsFilter').on('change', function (e) {
+            jQuery('#GroupsFilter').on('change', function (e) {
                 if (DEBUG) {
                     console.debug(`${scriptInfo} selected group ID: `, e.target.value);
                 }
-                localStorage.setItem(`${scriptConfig.scriptData.prefix}_chosen_group`, e.target.value);
+                // Use the setLocalStorage function to update chosen_group
+                let localStorageSettings = getLocalStorage();
+                localStorageSettings.chosen_group = e.target.value;
+                saveLocalStorage(localStorageSettings);
             });
+
             // For the Attacks per Button Option
-            let attacksPerButton = localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKS_PER_BUTTON;
-            attacksPerButton = (parseInt(attacksPerButton) >= MIN_ATTACKS_PER_BUTTON) ? attacksPerButton : MIN_ATTACKS_PER_BUTTON;
+            let localStorageSettingsAPB = getLocalStorage();
+            let attacksPerButton = (parseInt(localStorageSettingsAPB.attack_per_button) >= MIN_ATTACKS_PER_BUTTON) ? localStorageSettingsAPB.attack_per_button : MIN_ATTACKS_PER_BUTTON;
+            localStorageSettingsAPB.attack_per_button = attacksPerButton;
+            saveLocalStorage(localStorageSettingsAPB);
+            jQuery('#AttPerBut').val(attacksPerButton);
 
-            localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, attacksPerButton)
-            jQuery('#raAttPerBut').val(attacksPerButton)
-
-            jQuery('#raAttPerBut').on('change', function (e) {
-                e.target.value = e.target.value.replace(/\D/g, '')
+            jQuery('#AttPerBut').on('change', function (e) {
                 if (e.target.value < 1 || isNaN(parseInt(e.target.value)) || parseInt(e.target.value) < MIN_ATTACKS_PER_BUTTON) {
-                    jQuery('#raAttPerBut').val(MIN_ATTACKS_PER_BUTTON);
+                    jQuery('#AttPerBut').val(MIN_ATTACKS_PER_BUTTON);
                     e.target.value = MIN_ATTACKS_PER_BUTTON;
                 }
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Attacks per Button: `, e.target.value);
                 }
-                localStorage.setItem(`${scriptConfig.scriptData.prefix}_AttPerBut`, e.target.value);
+                // Update AttPerBut in localStorage using setLocalStorage
+                let localStorageSettingsAttPerButChange = getLocalStorage();
+                localStorageSettingsAttPerButChange.attack_per_button = e.target.value;
+                saveLocalStorage(localStorageSettingsAttPerButChange);
             });
+
+            // For the delay Option
+            let localStorageSettingsDelay = getLocalStorage();
+            let delay = localStorageSettingsDelay.delay;
+            delay = (parseInt(localStorageSettingsDelay.delay) >= MIN_DELAY) ? localStorageSettingsDelay.delay : MIN_DELAY;
+            localStorageSettingsDelay.delay = delay;
+            saveLocalStorage(localStorageSettingsDelay);
+            jQuery('#DelayTab').val(delay);
+
+            jQuery('#DelayTab').on('change', function (e) {
+                const inputValue = parseInt(e.target.value);
+                const defaultValue = MIN_DELAY;
+
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Delay: `, inputValue);
+                }
+
+                // Use setLocalStorage to update delay value
+                let localStorageSettingsDelay = getLocalStorage();
+                localStorageSettingsDelay.delay = (inputValue >= defaultValue) ? inputValue : defaultValue;
+                saveLocalStorage(localStorageSettingsDelay);
+
+                // Update the value in the input field
+                jQuery('#DelayTab').val(localStorageSettingsDelay.delay);
+            });
+
+            // For the unit selection type Option
+            jQuery('#UnitSelectionType').on('change', function (e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Unit Selection Type: `, e.target.value);
+                }
+
+                // Use setLocalStorage to update unit_selection_type value
+                let localStorageSettingsUnitSelection = getLocalStorage();
+                localStorageSettingsUnitSelection.unit_selection_type = e.target.value;
+                saveLocalStorage(localStorageSettingsUnitSelection);
+
+                // Toggle visibility of corresponding divs
+                if (e.target.value === 'dynamically') {
+                    jQuery('#dynamic-unit').show();
+                    jQuery('#manual-unit').hide();
+                } else {
+                    jQuery('#dynamic-unit').hide();
+                    jQuery('#manual-unit').show();
+                }
+            });
+
+            // For the max attacks per village Option
+            let localStorageSettingsMaxAttacks = getLocalStorage();
+            let maxAttacksPerVillage = localStorageSettingsMaxAttacks.max_attacks_per_village;
+            maxAttacksPerVillage = (parseInt(maxAttacksPerVillage) >= 0) ? maxAttacksPerVillage : 0;
+            localStorageSettingsMaxAttacks.max_attacks_per_village = maxAttacksPerVillage;
+            saveLocalStorage(localStorageSettingsMaxAttacks);
+            jQuery('#MaxAttPerVil').val(maxAttacksPerVillage);
+
+            jQuery('#MaxAttPerVil').on('change', function (e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Max Attacks per Village: `, e.target.value);
+                }
+
+                // Ensure the value is above 0
+                const newValue = Math.max(0, parseInt(e.target.value)) || 0;
+
+                // Use setLocalStorage to update max_attacks_per_village value
+                let localStorageSettingsMaxAttacks = getLocalStorage();
+                localStorageSettingsMaxAttacks.max_attacks_per_village = newValue;
+                saveLocalStorage(localStorageSettingsMaxAttacks);
+
+                // Update the input value to the sanitized value
+                jQuery('#MaxAttPerVil').val(newValue);
+            });
+
+
             // For the Send spy select menu
-            jQuery('#raSendSpy').on('change', function (e) {
+            jQuery('#SendSpy').on('change', function (e) {
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Send Spy: `, e.target.value);
                 }
-                localStorage.setItem(`${scriptConfig.scriptData.prefix}_send_spy`, e.target.value);
+                // Use setLocalStorage to update send_spy value
+                let localStorageSettingsSendSpy = getLocalStorage();
+                localStorageSettingsSendSpy.send_spy = e.target.value;
+                saveLocalStorage(localStorageSettingsSendSpy);
             });
-            //  For the coord input text area
-            jQuery('#raCoordInput').on('change', function (e) {
+
+            // For the keep catapults
+            jQuery('#KeepCatapults').on('change', function (e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Keep catapults: `, e.target.value);
+                }
+                // Use setLocalStorage to update send_spy value
+                let localStorageSettingsKeepCatapults = getLocalStorage();
+                localStorageSettingsKeepCatapults.keep_catapults = e.target.value;
+                saveLocalStorage(localStorageSettingsKeepCatapults);
+            });
+
+
+            // Initialize units_to_send and units_to_keep values from local storage
+            const localStorageSettingsUnits = getLocalStorage();
+
+            // Initialize units_to_send
+            for (const unit in localStorageSettingsUnits.units_to_send) {
+                const inputValue = localStorageSettingsUnits.units_to_send[unit] || 0;
+                jQuery(`#send_unit_${unit}`).val(inputValue);
+            }
+
+            // Initialize units_to_keep
+            for (const unit in localStorageSettingsUnits.units_to_keep) {
+                const inputValue = localStorageSettingsUnits.units_to_keep[unit] || 0;
+                jQuery(`#keep_unit_${unit}`).val(inputValue);
+            }
+
+            // Handle function for unit input changes
+            function handleUnitInputChange(e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} ${e.target.id}: `, e.target.value);
+                }
+                const id = e.target.id;
+                let sendOrKeep = "";
+                if (id.startsWith('send')) {
+                    sendOrKeep = 'units_to_send';
+                } else if (id.startsWith('keep')) {
+                    sendOrKeep = 'units_to_keep';
+                }
+
+                // Ensure the input is at least 0
+                const inputValue = parseInt(e.target.value) >= 0 ? parseInt(e.target.value) : 0;
+
+                jQuery(`#${e.target.id}`).val(inputValue);
+
+                // Use setLocalStorage to update unit value
+                let localStorageSettingsUnit = getLocalStorage();
+                localStorageSettingsUnit[sendOrKeep][e.target.defaultValue] = inputValue;
+                saveLocalStorage(localStorageSettingsUnit);
+            }
+
+            // Attach the generic function to all unit number inputs
+            jQuery('.ra-unit-selector').on('change', function (e) {
+                handleUnitInputChange(e);
+            });
+
+
+            let target_coords = getLocalStorage().target_coordinates;
+            jQuery('#CoordInput').val(target_coords.join(' '));
+            // For the coord input text area
+            jQuery('#CoordInput').on('change', function (e) {
                 let startTime = new Date().getTime();
                 let amountOfCoords = 0;
-                let existingCoordinates = []
+                let existingCoordinates = [];
                 const coordinates = this.value.match(COORD_REGEX);
                 if (coordinates) {
                     amountOfCoords = coordinates.length;
                     existingCoordinates = coordinates.filter(coord => checkIfVillageExists(coord));
                     this.value = existingCoordinates.join(' ');
-                    jQuery('#raCoordInput').text(existingCoordinates.length);
+                    jQuery('#CoordInput').text(existingCoordinates.length);
                 } else {
                     this.value = '';
-                    jQuery('#raCoordInput').text(0);
+                    jQuery('#CoordInput').text(0);
                 }
                 let endTime = new Date().getTime();
-                if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to filter ${amountOfCoords} coords and check for their existence.\n${scriptInfo} ${existingCoordinates.length} existing coordinates have been found.`);
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to filter ${amountOfCoords} coords and check for their existence.\n${scriptInfo} ${existingCoordinates.length} existing coordinates have been found.`);
+                }
+
+                // Update target_coordinates in localStorage using setLocalStorage
+                let localStorageSettingsCoordInput = getLocalStorage();
+                localStorageSettingsCoordInput.target_coordinates = existingCoordinates;
+                saveLocalStorage(localStorageSettingsCoordInput);
+            });
+            jQuery('#deleteAllEntries').on('click', function () {
+                // Remove all entries with the class sb-arrival-time
+                jQuery('.sb-arrival-time').remove();
+
+                // Clear saved times in local storage
+                const localStorageObject = getLocalStorage();
+                localStorageObject.arrival_times = [];
+                saveLocalStorage(localStorageObject);
+            });
+            jQuery('#addTimeEntry').on('click', async function (e) {
+                e.preventDefault();
+
+                // Logic to validate and add new entry into the fieldset with the id arrivalTimeFieldset
+                const startTimeString = jQuery('#startDateTime').val();
+                const endTimeString = jQuery('#endDateTime').val();
+
+                if (startTimeString && endTimeString) {
+                    const currentTime = Date.now();
+                    const startTime = new Date(startTimeString).getTime();
+                    const endTime = new Date(endTimeString).getTime();
+
+                    if (!isNaN(startTime) && !isNaN(endTime) && startTime < endTime && currentTime < endTime) {
+                        // Valid entry, proceed to update localStorage
+                        const localStorageObject = getLocalStorage();
+                        localStorageObject.arrival_times.push([startTime, endTime]);
+                        saveLocalStorage(localStorageObject);
+
+                        // Create a new <div class="sb-grid sb-grid-5 sb-arrival-time"> for the new entry
+                        const newEntryDiv = jQuery('<div class="sb-grid sb-grid-5 sb-arrival-time ra-mb10"></div>');
+                        newEntryDiv.append(`<div>${formatTime(new Date(startTime))}</div>`);
+                        newEntryDiv.append(`<div>${formatTime(new Date(endTime))}</div>`);
+                        newEntryDiv.append('<div class="delete-entry-btn">X</div>');
+                        newEntryDiv.append('<div></div>'); // Empty div
+                        newEntryDiv.append('<div></div>'); // Empty div
+                        jQuery('#arrivalTimeFieldset').append(newEntryDiv);
+
+                        // Event handler for the delete entry button
+                        newEntryDiv.find('.delete-entry-btn').on('click', function () {
+                            newEntryDiv.remove();
+                            const updatedLocalStorage = getLocalStorage();
+                            updatedLocalStorage.arrival_times = updatedLocalStorage.arrival_times.filter(timeSpan => !isEqual(timeSpan, [startTime, endTime]));
+                            saveLocalStorage(updatedLocalStorage);
+                        });
+                    } else {
+                        // Invalid entry, handle accordingly (e.g., show an error message)
+                        console.log('Invalid entry. Please check the selected times.');
+                    }
+                } else {
+                    // Invalid entry, handle accordingly (e.g., show an error message)
+                    console.log('Invalid entry. Please select both start and end times.');
+                }
             });
             // For the Calculate Fakes Button
             jQuery('#calculateFakes').on('click', async function (e) {
@@ -282,12 +612,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let playerVillages;
                 let targetCoords = [];
 
-                targetCoords = jQuery('#raCoordInput').val().trim().match(COORD_REGEX) ?? [];
+                targetCoords = jQuery('#CoordInput').val().trim().match(COORD_REGEX) ?? [];
                 if (targetCoords.length === 0) {
                     UI.ErrorMessage(twSDK.tt('No target coordinates!'));
                     return;
                 }
-                const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
+                const groupId = getLocalStorage().chosen_group;
 
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Target coordinates: `, targetCoords);
@@ -316,7 +646,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     console.debug(`${scriptInfo} Player villages with points: `, playerVillages);
                 }
                 let spySend;
-                const spy = localStorage.getItem(`${scriptConfig.scriptData.prefix}_send_spy`) ?? "yes";
+                const spy = getLocalStorage().send_spy;
                 if (spy === "yes") {
                     spySend = true;
                 } else {
@@ -634,7 +964,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         function createSendButtons(URIs) {
             // Get the number of attacks per button
-            let nrSplit = parseInt(localStorage.getItem(`${scriptConfig.scriptData.prefix}_AttPerBut`) ?? DEFAULT_ATTACKS_PER_BUTTON);
+            let nrSplit = parseInt(getLocalStorage().attack_per_button);
+
             if (DEBUG) console.debug(`${scriptInfo} Number of attacks per button: ${nrSplit}`);
 
             // Fetch the 'open_tabs' div where buttons will be appended
@@ -680,9 +1011,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Render groups select
         function renderGroupsFilter() {
-            const groupId = localStorage.getItem(`${scriptConfig.scriptData.prefix}_chosen_group`) ?? 0;
+            const groupId = getLocalStorage().chosen_group;
             let groupsFilter = `
-		<select name="ra_groups_filter" id="raGroupsFilter">
+		<select name="group-filter" id="GroupsFilter">
 	`;
 
             for (const [_, group] of Object.entries(groups.result)) {
@@ -706,9 +1037,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Render send spy select
         function renderSpySelect() {
-            const sendSpy = localStorage.getItem(`${scriptConfig.scriptData.prefix}_send_spy`) ?? "yes";
+            const sendSpy = getLocalStorage().send_spy;
             let contentSpySelect = `
-            <select id="raSendSpy">
+            <select id="SendSpy">
             `;
 
             if (sendSpy === "yes") {
@@ -727,6 +1058,124 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return contentSpySelect;
         }
 
+        // Helper function to format time for display
+        function formatTime(time) {
+            return new Date(time).toLocaleString();
+        }
+
+        // Helper function to check array equality
+        function isEqual(arr1, arr2) {
+            return arr1[0] === arr2[0] && arr1[1] === arr2[1];
+        }
+
+        // Helper: Render unit selection type
+        function renderUnitSelectionType() {
+            const unitSelectionType = getLocalStorage().unit_selection_type;
+            let contentUnitSelectionType = `
+            <select id="UnitSelectionType">
+            `;
+
+            if (unitSelectionType === "dynamically") {
+                contentUnitSelectionType += `
+                <option value="dynamically" selected>${twSDK.tt("dynamically")}</option>
+                <option value="manually">${twSDK.tt("manually")}</option>
+                `;
+            } else {
+                contentUnitSelectionType += `
+                <option value="dynamically">${twSDK.tt("dynamically")}</option>
+                <option value="manually" selected>${twSDK.tt("manually")}</option>
+                `;
+            }
+
+            contentUnitSelectionType += `</select>`;
+            return contentUnitSelectionType;
+        }
+
+        //Helper: Render dynamic unit selection
+        function renderDynamicUnitSelection() {
+            const spySelect = renderSpySelect();
+            const unitSelectionType = getLocalStorage().unit_selection_type;
+            const keepCatapults = getLocalStorage().keep_catapults;
+            let visibility;
+            if (unitSelectionType === "dynamically") {
+                visibility = `style="display: block;"`
+            } else {
+                visibility = `style="display: none;"`
+            }
+            let contentDynamicUnitSelection = `
+            <div class="ra-mb10" id="dynamic-unit" ${visibility}>
+                <div class="sb-grid sb-grid-2">
+                    <fieldset class="sb-fieldset">
+                        <legend>${twSDK.tt('Send Spy?')}</legend>
+                        ${spySelect}
+                    </fieldset>
+                    <fieldset class="sb-fieldset">
+                        <legend>${twSDK.tt('Keep Catapults')}</legend>
+                        <input id="KeepCatapults" type="number" value="${keepCatapults}">
+                    </fieldset>
+                </div>
+            </div>
+            `;
+
+            return contentDynamicUnitSelection;
+        }
+
+        //Helper: Render manual unit selection
+        function renderManualUnitSelection() {
+            const unitSelectionType = getLocalStorage().unit_selection_type;
+            let visibility;
+            if (unitSelectionType === "dynamically") {
+                visibility = `style="display: none;"`
+            } else {
+                visibility = `style="display: block;"`
+            }
+            const units = game_data.units;
+            let contentManualUnitSelection = "";
+            const unitsToIgnore = ['militia', 'knight', 'snob'];
+            let unitTableSend = buildUnitsPicker(game_data.units, unitsToIgnore, "send", 'number');
+            let unitTableKeep = buildUnitsPicker(game_data.units, unitsToIgnore, "keep", 'number');
+
+
+            contentManualUnitSelection = `
+            <div class="ra-mb10" id="manual-unit" ${visibility}>
+                <fieldset class="sb-fieldset">
+                    <legend>${twSDK.tt('Enter units to send')}</legend>
+                    ${unitTableSend}
+                </fieldset>
+                <fieldset class="sb-fieldset">
+                    <legend>${twSDK.tt('Enter units to keep')}</legend>
+                    ${unitTableKeep}
+                </fieldset>
+            </div>
+            `;
+
+            return contentManualUnitSelection;
+        }
+
+        //Helper: Render Arrival time selection
+        function renderArrivalTimeSelector() {
+            let contentArrivalTimeSelector = `
+                <fieldset class="sb-fieldset" id="arrivalTimeFieldset">
+                    <legend>${twSDK.tt("Arrival time")}</legend>
+                    <div class="sb-grid sb-grid-5 ra-mb10">
+                        <div>
+                            <input type="datetime-local" id="startDateTime" required>
+                        </div>
+                        <div>
+                            <input type="datetime-local" id="endDateTime" required>
+                        </div>
+                        <div>
+                            <button type="button" class="add-entry-btn" id="addTimeEntry">+</button>
+                        </div>
+                        <div>
+                            <button type="button" class="add-entry-btn" id="deleteAllEntries">${twSDK.tt("Delete all arrival times")}</button>
+                        </div>
+                        <div></div>
+                    </div>
+                </fieldset>
+            `;
+            return contentArrivalTimeSelector;
+        }
         // Helper: Fetch village groups
         async function fetchVillageGroups() {
             let fetchGroups = '';
@@ -823,6 +1272,45 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return troopsForGroup;
         }
 
+        // Service: Function to get settings from localStorage
+        function getLocalStorage() {
+            const localStorageSettings = localStorage.getItem('sbFakegeneratorSettings');
+
+            if (localStorageSettings) {
+                // If settings exist in localStorage, parse and return the object
+                return JSON.parse(localStorageSettings);
+            } else {
+                // If no settings found, create an object with default values
+                const defaultSettings = {
+                    chosen_group: 0,
+                    attack_per_button: DEFAULT_ATTACKS_PER_BUTTON,
+                    delay: DEFAULT_DELAY,
+                    unit_selection_type: 'dynamically',
+                    max_attacks_per_village: DEFAULT_MAX_ATTACKS_PER_VILLAGE,
+                    send_spy: 'yes',
+                    keep_catapults: 0,
+                    units_to_send: {},
+                    units_to_keep: {},
+                    arrival_times: [],
+                    target_coordinates: []
+                };
+
+                // Initialize units_to_send and units_to_keep with each unit set to 0
+                game_data.units.forEach(unit => {
+                    defaultSettings.units_to_send[unit] = 0;
+                    defaultSettings.units_to_keep[unit] = 0;
+                });
+
+                return defaultSettings;
+            }
+        }
+
+        //Service: Function to save settings to localStorage
+        function saveLocalStorage(settingsObject) {
+            // Stringify and save the settings object
+            localStorage.setItem('sbFakegeneratorSettings', JSON.stringify(settingsObject));
+        }
+
         // Service: Fetch world config and needed data
         async function fetchWorldConfigData() {
             try {
@@ -837,5 +1325,56 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 console.error(`${scriptInfo} Error:`, error);
             }
         }
+
+        // Copied and edited from twSDK to be able to call it twice and get different IDs
+        // Please implement into SDK somehow
+        function buildUnitsPicker(selectedUnits, unitsToIgnore, id_prefix, type = 'checkbox') {
+            let unitsTable = ``;
+
+            let thUnits = ``;
+            let tableRow = ``;
+
+            game_data.units.forEach((unit) => {
+                if (!unitsToIgnore.includes(unit)) {
+                    let checked = '';
+                    if (selectedUnits.includes(unit) && type == "checkbox") {
+                        checked = `checked`;
+                    }
+
+                    thUnits += `
+                        <th class="ra-text-center">
+                            <label for="${id_prefix}_unit_${unit}">
+                                <img src="/graphic/unit/unit_${unit}.png">
+                            </label>
+                        </th>
+                    `;
+
+                    tableRow += `
+                        <td class="ra-text-center">
+                            <input name="ra_chosen_units" type="${type}" ${checked} id="${id_prefix}_unit_${unit}" class="ra-unit-selector" value="${unit}" />
+                        </td>
+                    `;
+                }
+            });
+
+            unitsTable = `
+                <table class="ra-table ra-table-v2" width="100%" id="${id_prefix}_raUnitSelector">
+                    <thead>
+                        <tr>
+                            ${thUnits}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            ${tableRow}
+                        </tr>
+                    </tbody>
+                </table>
+            `;
+
+            return unitsTable;
+        }
+
+
     }
 );

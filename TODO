@@ -1,7 +1,29 @@
 New features:
 - add an option for players to set delay between opening tabs (at least 250 ms)
-- add an option for players to set min
+- catas remaining
+- multiple arrival times
+- show number of targets/ how many fakes generated of the input coords
+- workbench export?
+- notes export?
+- max number of fakes from own villages
+- remove coordinates of own tribe from the coord list
+- make coord input a button (more calcs possible)
+- save coords in local storage
+- save local storage in one object
+- dynamic/manuell unit input
+- fix copied bug in fetchTroopsForCurrentGroup
+- script usage counter?
 
+Things i have to change to UI for:
+- dynamic/manuell unit input
+- add an option for players to set delay between opening tabs (at least 250 ms)
+- catas remaining
+- multiple arrival times
+- show number of targets/ how many fakes generated of the input coords
+- workbench export?
+- notes export?
+- max number of fakes from own villages
+- make coord input a button (more calcs possible)
 
 
 

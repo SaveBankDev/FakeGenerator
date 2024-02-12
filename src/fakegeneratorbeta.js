@@ -870,12 +870,16 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let distance;
             let travelTime;
             let unitSpeed;
+            let timestamp;
+            let timeBool;
+            let nightBool;
 
             const localStorageObject = getLocalStorage();
             const unitSelectionType = localStorageObject.unit_selection_type;
             const unitsToKeep = localStorageObject.units_to_keep;
             const unitsToSend = localStorageObject.units_to_send;
             const keepCatapults = localStorageObject.keep_catapults;
+            const arrivalTimes = localStorageObject.arrival_times;
             let playerVillagesWithEnoughUnits = [];
             console.log("Time to init: ", new Date().getTime() - startTime);
             if (unitSelectionType === "manually") {
@@ -893,12 +897,32 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     for (let playerVillage of playerVillagesWithEnoughUnits) {
                         distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
                         travelTime = twSDK.getTravelTimeInSecond(distance, unitSpeed) * 1000;
-                        if (!checkArrivalTimeOutsideNightBonus(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))) {
-                            continue;
+                        timestamp = currentTime + travelTime;
+                        timeBool = false;
+                        if (arrivalTimes.length === 0) {
+                            timeBool = true;
                         }
-                        if (!isTimestampInArrivalTimes((currentTime + travelTime))) {
-                            continue;
+                        for (const [start, end] of arrivalTimes) {
+                            if (timestamp >= start && timestamp <= end) {
+                                timeBool = true;
+                                break;
+                            }
                         }
+                        if (!timeBool) continue;
+                        const time = new Date(currentTime + travelTime);
+                        const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
+
+                        // We want to arrive shortly before the night bonus to give the player time to send the attacks
+                        const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
+                        const checkEndNb = parseInt(nightInfo.end_hour);
+
+                        // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
+                        if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
+                            nightBool = false; // edge case where start and end time are the same
+                        } else {
+                            nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                        }
+                        if (!nightBool) continue;
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -914,27 +938,47 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 unitSpeed = configSpeed.catapult.speed;
                 for (let playerVillage of playerVillages) {
                     subtractUnitsFromVillage(playerVillage, unitObjectCatapult);
+                    minCat = getMinAmountOfCatapults(playerVillage.points, fakeLimit);
+                    if (playerVillage.catapult < minCat) {
+                        continue;
+                    }
+                    if (spySend && playerVillage.spy <= 0) {
+                        continue;
+                    }
+                    playerVillagesWithEnoughUnits.push(playerVillage);
                 }
-
+                console.log("Time to unit subtract and sort out: ", new Date().getTime() - startTime);
                 for (let targetCoord of targetCoords) {
                     let subArray = [targetCoord];
                     for (let playerVillage of playerVillages) {
                         distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
                         travelTime = twSDK.getTravelTimeInSecond(distance, unitSpeed) * 1000;
-                        if (!isTimestampInArrivalTimes((currentTime + travelTime))) {
-                            continue;
+                        timestamp = currentTime + travelTime;
+                        timeBool = false;
+                        if (arrivalTimes.length === 0) {
+                            timeBool = true;
                         }
-                        if (!checkArrivalTimeOutsideNightBonus(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))) {
-                            continue;
+                        for (const [start, end] of arrivalTimes) {
+                            if (timestamp >= start && timestamp <= end) {
+                                timeBool = true;
+                                break;
+                            }
                         }
-                        // Check the minimum amount of needed catapults 
-                        minCat = getMinAmountOfCatapults(playerVillage.points, fakeLimit);
-                        if (playerVillage.catapult < minCat) {
-                            continue;
+                        if (!timeBool) continue;
+                        const time = new Date(currentTime + travelTime);
+                        const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
+
+                        // We want to arrive shortly before the night bonus to give the player time to send the attacks
+                        const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
+                        const checkEndNb = parseInt(nightInfo.end_hour);
+
+                        // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
+                        if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
+                            nightBool = false; // edge case where start and end time are the same
+                        } else {
+                            nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
                         }
-                        if (spySend && playerVillage.spy <= 0) {
-                            continue;
-                        }
+                        if (!nightBool) continue;
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -1202,7 +1246,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 return (reqCatapults > 0) ? reqCatapults : 1;
             }
         }
-
+        // Currently unused since function call overhead apparently ruins performance 
+        // Helper: Checks if the given timestamp is in our arrival times array
         function isTimestampInArrivalTimes(timestamp) {
             const localStorageObject = getLocalStorage();
             const arrivalTimes = localStorageObject.arrival_times;
@@ -1218,6 +1263,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return false;
         }
 
+        // Currently unused since function call overhead apparently ruins performance 
         // Helper: Checks if the arrival time is in the night bonus or not
         function checkArrivalTimeOutsideNightBonus(start_hour, end_hour, timestamp) {
             const time = new Date(timestamp);

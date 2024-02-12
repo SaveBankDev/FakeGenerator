@@ -764,12 +764,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         allCombinations = allCombinations.map(combination => {
                             return combination.filter(element => element !== chosenVillage);
                         });
+                        allCombinations.sort((a, b) => a.length - b.length);
                     }
                 } else if (unitSelectionType == "dynamically") {
                     if (chosenVillage.catapult < minCat || (spySend && chosenVillage.spy <= 0)) {
                         allCombinations = allCombinations.map(combination => {
                             return combination.filter(element => element !== chosenVillage);
                         });
+                        allCombinations.sort((a, b) => a.length - b.length);
                     }
                 } else {
                     console.error("Invalid unit selection type", unitSelectionType)
@@ -814,6 +816,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     return;
                 }
             }
+            shuffleArray(generatedFakeLinks);
             if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks[0]}`);
             // Get end timestamp
             let endTime = new Date().getTime();
@@ -1114,6 +1117,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         function getVillagePointsFromCoord(coord) {
             let village = villageData[coord];
             return village[1];
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
         }
 
         // Helper: Create a function to count the frequency of each value in the remaining value arrays

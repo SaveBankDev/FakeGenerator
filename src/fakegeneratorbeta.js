@@ -43,7 +43,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v1.0.1',
+        version: 'v2.0',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -71,8 +71,8 @@ var scriptConfig = {
             'manually': 'Manually',
             'Unit selection': 'Unit selection',
             'Keep Catapults': 'Keep Catapults',
-            'Enter units to send': 'Enter units to send',
-            'Enter units to keep': 'Enter units to keep',
+            'Enter units to send (-1 for all troops)': 'Enter units to send (-1 for all troops)',
+            'Enter units to keep (-1 for all troops)': 'Enter units to keep (-1 for all troops)',
             'Coordinates': 'Coordinates',
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
@@ -100,8 +100,8 @@ var scriptConfig = {
             'manually': 'Manually',
             'Unit selection': 'Unit selection',
             'Keep Catapults': 'Keep Catapults',
-            'Enter units to send': 'Enter units to send',
-            'Enter units to keep': 'Enter units to keep',
+            'Enter units to send (-1 for all troops)': 'Enter units to send (-1 for all troops)',
+            'Enter units to keep (-1 for all troops)': 'Enter units to keep (-1 for all troops)',
             'Coordinates': 'Coordinates',
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
@@ -128,8 +128,8 @@ var scriptConfig = {
             'manually': 'Manuell',
             'Unit selection': 'Truppenauswahl',
             'Keep Catapults': 'Katapulte zurückhalten',
-            'Enter units to send': 'Zu sendende Truppen eingeben',
-            'Enter units to keep': 'Zu behaltende Truppen eingeben',
+            'Enter units to send (-1 for all troops)': 'Zu sendende Truppen eingeben (-1 für alle Truppen)',
+            'Enter units to keep (-1 for all troops)': 'Zu behaltende Truppen eingeben (-1 für alle Truppen)',
             'Coordinates': 'Koordinaten',
             'Delete all arrival times': 'Alle Ankunftszeiten löschen',
             'Arrival time': 'Ankunftszeiten'
@@ -588,14 +588,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             console.log('Entry already exists.');
                             return;
                         }
+
                         // Valid entry, proceed to update localStorage
                         localStorageObject.arrival_times.push([startTime, endTime]);
                         saveLocalStorage(localStorageObject);
 
                         // Create a new <div class="sb-grid sb-grid-5 sb-arrival-time"> for the new entry
                         const newEntryDiv = jQuery('<div class="sb-grid sb-grid-5 sb-arrival-time ra-mb10"></div>');
-                        newEntryDiv.append(`<div>${formatTime(new Date(startTime))}</div>`);
-                        newEntryDiv.append(`<div>${formatTime(new Date(endTime))}</div>`);
+                        newEntryDiv.append(`<div>${formatLocalizedTime(new Date(startTime))}</div>`);
+                        newEntryDiv.append(`<div>${formatLocalizedTime(new Date(endTime))}</div>`);
                         newEntryDiv.append('<div class="delete-entry-btn">X</div>');
                         newEntryDiv.append('<div></div>'); // Empty div
                         newEntryDiv.append('<div></div>'); // Empty div
@@ -1382,11 +1383,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             contentManualUnitSelection = `
             <div class="ra-mb10" id="manual-unit" ${visibility}>
                 <fieldset class="sb-fieldset">
-                    <legend>${twSDK.tt('Enter units to send')}</legend>
+                    <legend>${twSDK.tt('Enter units to send (-1 for all troops)')}</legend>
                     ${unitTableSend}
                 </fieldset>
                 <fieldset class="sb-fieldset">
-                    <legend>${twSDK.tt('Enter units to keep')}</legend>
+                    <legend>${twSDK.tt('Enter units to keep (-1 for all troops)')}</legend>
                     ${unitTableKeep}
                 </fieldset>
             </div>
@@ -1434,6 +1435,16 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             );
 
             return villageGroups;
+        }
+        function formatLocalizedTime(date) {
+            return date.toLocaleDateString(undefined, {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: false,
+            });
         }
         // Helper: Fetch home troop counts for current group
         async function fetchTroopsForCurrentGroup(groupId) {
@@ -1523,8 +1534,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             if (arrivalTimes && arrivalTimes.length > 0) {
                 // Iterate through saved arrival times and create entries
                 for (const timeSpan of arrivalTimes) {
-                    const startTime = new Date(timeSpan[0]).toLocaleString(); // Convert timestamp to locale format
-                    const endTime = new Date(timeSpan[1]).toLocaleString(); // Convert timestamp to locale format
+                    const startTime = formatLocalizedTime(new Date(timeSpan[0]));
+                    const endTime = formatLocalizedTime(new Date(timeSpan[1]));
 
                     // Create a new entry div
                     const newEntryDiv = jQuery('<div class="sb-grid sb-grid-5 sb-arrival-time"></div>');

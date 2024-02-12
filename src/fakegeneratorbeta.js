@@ -760,7 +760,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
                 // Remove used village if not enough remaining troops
                 if (unitSelectionType == "manually") {
-                    if (!isValidUnitsToSend(chosenVillage, unitsToSend)) {
+                    if (!isValidUnitsToSend(chosenVillage, unitsToSend) || Object.values(unitsToSend).some(value => value === -1)) {
                         allCombinations = allCombinations.map(combination => {
                             return combination.filter(element => element !== chosenVillage);
                         });
@@ -1204,6 +1204,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         function createSendButtons(URIs) {
             // Get the number of attacks per button
             let nrSplit = parseInt(getLocalStorage().attack_per_button);
+            let delay = parseInt(getLocalStorage().delay);
 
             if (DEBUG) console.debug(`${scriptInfo} Number of attacks per button: ${nrSplit}`);
 
@@ -1237,7 +1238,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     this.classList.add('btn-confirm-clicked');
                     // Open each link in new tab
                     URIs.slice(start - 1, end).forEach((link, index) => {  // adjust start for zero-based index
-                        setTimeout(() => { window.open(link) }, index * 400);
+                        setTimeout(() => { window.open(link) }, index * delay);
                     })
                 });
 
@@ -1295,11 +1296,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             contentSpySelect += `</select>`;
             return contentSpySelect;
-        }
-
-        // Helper function to format time for display
-        function formatTime(time) {
-            return new Date(time).toLocaleString();
         }
 
         // Helper function to check array equality
@@ -1619,7 +1615,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
-        // Copied and edited from twSDK to be able to call it twice and get different IDs and to not have the checked stuff
+        // Copied and edited from twSDK by RedAlert to be able to call it twice and get different IDs and to not have the checked stuff
         // Some cleaned up version of this should be in the sdk probably
         function buildUnitsPicker(unitsToIgnore, id_prefix, type = 'checkbox') {
             let unitsTable = ``;

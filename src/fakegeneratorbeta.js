@@ -164,6 +164,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const groups = await fetchVillageGroups();
         const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
         const villageData = villageArrayToDict(villages);
+        // REMOVE IN LIVE
+        let usedVillageIds = new Set();
 
         // Entry point
         (async function () {
@@ -342,6 +344,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 #deleteAllEntries:hover {
                     background: #c92722;
                     background: linear-gradient(to bottom, #c92722 0%,#a00d08 100%);
+                }
+                .sb-mb5 {
+                    margin-bottom: 5px !important;
                 }
             </style>`;
 
@@ -674,7 +679,20 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     spySend = false;
                 }
 
-                calculateAttacks(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), worldUnitInfo.config, spySend, unchangedTroopData);
+
+                // REMOVE IN LIVE
+                let array = [];
+                if (DEBUG) {
+                    // Moved outside to only be generated once, records all used villageIds
+                    for (i = 0; i < 99; i++) {
+                        array.push(generateRandomVillageObject());
+                    }
+                    unchangedTroopData = JSON.parse(JSON.stringify(array));
+                    calculateAttacks(array, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), worldUnitInfo.config, spySend, unchangedTroopData);
+
+                } else {
+                    calculateAttacks(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), worldUnitInfo.config, spySend, unchangedTroopData);
+                }
             });
         }
 
@@ -682,6 +700,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             // Time to calculate calculation time
             let startTime = new Date().getTime();
             let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend);
+            if (DEBUG) {
+                let endTimeGetAll = new Date().getTime();
+                if (DEBUG) console.debug(`${scriptInfo} The script took ${endTimeGetAll - startTime} milliseconds to calculate ${allCombinations} with ${amountOfCombinations} possible combinations.`);
+            }
 
             if (DEBUG) {
                 console.debug(`${scriptInfo} All calculated Combinations: `, allCombinations);
@@ -713,8 +735,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitsToSend = localStorageObject.units_to_send;
             const unitsToKeep = localStorageObject.units_to_keep;
             const keepCatapults = localStorageObject.keep_catapults;
-
+            let startTimeWhile;
+            let whileCounter;
+            if (DEBUG) {
+                startTimeWhile = new Date().getTime();
+                whileCounter = 0;
+            }
             while (allCombinations.length > 0) {
+                if (DEBUG) whileCounter += 1;
                 let combination = allCombinations.shift();;
                 // Next loop if the combination only contains the target village
                 if (combination.length < 2) {
@@ -778,6 +806,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     return;
                 }
             }
+            if (DEBUG) {
+                let endTimeWhile = new Date().getTime();
+                if (DEBUG) console.debug(`${scriptInfo} The script took ${endTimeWhile - startTimeWhile} milliseconds to calculate ${whileCounter} while loops for ${(endTimeWhile - startTimeWhile) / whileCounter} ms per while loops.`);
+            }
             if (DEBUG) console.debug(`${scriptInfo} Calculated fake pairs: ${calculatedFakePairs}`);
             if (DEBUG) {
                 let villageUsages = [];
@@ -830,6 +862,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // All possible combinations of player village and target  coords with consideration of arrival time outside the night bonus and minimum catapult am
         function getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend) {
+            let startTime = new Date().getTime();
             let allCombinations = [];
             let currentTime = Date.now();
             let minCat = 1;
@@ -840,44 +873,45 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             const localStorageObject = getLocalStorage();
             const unitSelectionType = localStorageObject.unit_selection_type;
+            const unitsToKeep = localStorageObject.units_to_keep;
+            const unitsToSend = localStorageObject.units_to_send;
+            const keepCatapults = localStorageObject.keep_catapults;
+            let playerVillagesWithEnoughUnits = [];
+            console.log("Time to init: ", new Date().getTime() - startTime);
             if (unitSelectionType === "manually") {
                 // Subtract units_to_keep from player villages 
-                const unitsToKeep = localStorageObject.units_to_keep;
-                const unitsToSend = localStorageObject.units_to_send;
                 unitSpeed = getSlowestSpeed(unitsToSend, configSpeed)
                 for (let playerVillage of playerVillages) {
                     subtractUnitsFromVillage(playerVillage, unitsToKeep);
+                    if (isValidUnitsToSend(playerVillage, unitsToSend)) {
+                        playerVillagesWithEnoughUnits.push(playerVillage);
+                    }
                 }
-
+                console.log("Time to unit subtract and sort out: ", new Date().getTime() - startTime);
                 for (let targetCoord of targetCoords) {
                     let subArray = [targetCoord];
-                    for (let playerVillage of playerVillages) {
-                        const unitsToSend = localStorageObject.units_to_send;
-                        if (!isValidUnitsToSend(playerVillage, unitsToSend)) {
-                            continue;
-                        }
+                    for (let playerVillage of playerVillagesWithEnoughUnits) {
                         distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
                         travelTime = twSDK.getTravelTimeInSecond(distance, unitSpeed) * 1000;
-                        if (!isTimestampInArrivalTimes((currentTime + travelTime))) {
+                        if (!checkArrivalTimeOutsideNightBonus(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))) {
                             continue;
                         }
-                        if (!checkArrivalTimeOutsideNightBonus(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))) {
+                        if (!isTimestampInArrivalTimes((currentTime + travelTime))) {
                             continue;
                         }
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
                     allCombinations.push(subArray);
+                    // console.log("Time to added array: ", new Date().getTime() - startTime, allCombinations.length);
                 }
 
 
             } else if (unitSelectionType === "dynamically") {
                 // Subtract units_to_keep from player villages 
-                const keepCatapults = localStorageObject.keep_catapults;
                 let unitObjectCatapult = createDefaultUnitsObject();
                 unitObjectCatapult["catapult"] = keepCatapults;
                 unitSpeed = configSpeed.catapult.speed;
-
                 for (let playerVillage of playerVillages) {
                     subtractUnitsFromVillage(playerVillage, unitObjectCatapult);
                 }
@@ -1233,7 +1267,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             for (let i = 0; i < nrButtons; i++) {
                 let button = document.createElement('button');
                 // Add CSS classes to the button
-                button.classList.add('btn', 'btn-confirm-yes');
+                button.classList.add('btn', 'btn-confirm-yes', 'sb-mb5');
 
                 let start = i * nrSplit + 1; // calculate starting index for display
                 let end = Math.min(URIs.length, start + nrSplit - 1); // calculate ending index, don't exceed total URIs
@@ -1676,5 +1710,48 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             return unitsTable;
         }
+        // REMOVE IN LIVE
+        // Helper function to generate random integer between min (inclusive) and max (exclusive)
+        function getRandomInt(min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
+        }
+
+        // REMOVE IN LIVE VERSION
+        function generateRandomVillageObject() {
+            // Generate a random coordinate string 'xxx|yyy'
+            const coord = `${getRandomInt(400, 450).toString().padStart(3, '0')}|${getRandomInt(450, 500).toString().padStart(3, '0')}`;
+
+            let villageId;
+
+            // Ensure villageId is unique by generating new ones until we find one that hasn't been used
+            do {
+                villageId = getRandomInt(1, 2001);
+            } while (usedVillageIds.has(villageId));
+
+            // Record the used villageId
+            usedVillageIds.add(villageId);
+
+            return {
+                archer: getRandomInt(0, 9999),
+                axe: getRandomInt(0, 9999),
+                catapult: getRandomInt(150, 160),
+                coord: coord,
+                heavy: getRandomInt(0, 9999),
+                knight: getRandomInt(0, 9999),
+                light: getRandomInt(0, 9999),
+                marcher: getRandomInt(0, 9999),
+                militia: getRandomInt(0, 1),
+                ram: getRandomInt(0, 9999),
+                points: getRandomInt(8000, 9000),
+                snob: getRandomInt(0, 1),
+                spear: getRandomInt(0, 9999),
+                spy: getRandomInt(0, 9999),
+                sword: getRandomInt(0, 9999),
+                villageId: villageId
+            };
+        }
+
     }
 );

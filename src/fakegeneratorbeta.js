@@ -1,6 +1,6 @@
 /* 
 * Script Name: Fake Generator
-* Version: v1.0.1
+* Version: v2.0
 * Last Updated: 2024-01-14
 * Author: SaveBank
 * Author Contact: Discord: savebank
@@ -14,7 +14,7 @@
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
-if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 10 minutes before Night bonus to give players time to send the attacks
+if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 15 minutes before Night bonus to give players time to send the attacks
 
 // Global variable
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
@@ -1251,6 +1251,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         setTimeout(() => { window.open(link) }, index * delay);
                     })
                 });
+                // Add an additional event listener to prevent the "Enter" key from triggering the button
+                button.addEventListener('keydown', function (event) {
+                    if (event.key === 'Enter') {
+                        // Prevent the default behavior for the "Enter" key
+                        event.preventDefault();
+                    }
+                });
 
                 // Append button to 'open_tabs' div
                 openTabsDiv.appendChild(button);
@@ -1669,7 +1676,5 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             return unitsTable;
         }
-
-
     }
 );

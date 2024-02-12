@@ -333,6 +333,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     align-items: center; 
                 }
                 #deleteAllEntries {
+                    padding: 8px;
+                    font-size: 11.5px;
+                    font-weight: bold;
                     background: #af281d;
                     background: linear-gradient(to bottom, #af281d 0%,#801006 100%);
                 }
@@ -757,14 +760,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
                 // Remove used village if not enough remaining troops
                 if (unitSelectionType == "manually") {
-                    let isValidUnitsToSend = true;
-                    for (const unitType in unitsToSend) {
-                        if (unitsToSend[unitType] == -1 || chosenVillage[unitType] < unitsToSend[unitType]) {
-                            isValidUnitsToSend = false;
-                            break;
-                        }
-                    }
-                    if (!isValidUnitsToSend) {
+                    if (!isValidUnitsToSend(chosenVillage, unitsToSend)) {
                         allCombinations = allCombinations.map(combination => {
                             return combination.filter(element => element !== chosenVillage);
                         });
@@ -854,14 +850,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     let subArray = [targetCoord];
                     for (let playerVillage of playerVillages) {
                         const unitsToSend = localStorageObject.units_to_send;
-                        let isValidUnitsToSend = true;
-                        for (const unitType in unitsToSend) {
-                            if (unitsToSend[unitType] !== -1 && playerVillage[unitType] < unitsToSend[unitType]) {
-                                isValidUnitsToSend = false;
-                                break;
-                            }
-                        }
-                        if (!isValidUnitsToSend) {
+                        if (!isValidUnitsToSend(playerVillage, unitsToSend)) {
                             continue;
                         }
                         distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
@@ -985,14 +974,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     if (usedPlayerVillages.get(village.villageId) >= maxAttacksFromVillage && maxAttacksFromVillage > 0) {
                         continue;
                     }
-                    let isValidUnitsToSend = true;
-                    for (const unitType in unitsToSend) {
-                        if (unitsToSend[unitType] !== -1 && village[unitType] < unitsToSend[unitType]) {
-                            isValidUnitsToSend = false;
-                            break;
-                        }
-                    }
-                    if (!isValidUnitsToSend) {
+                    if (!isValidUnitsToSend(village, unitsToSend)) {
                         continue;
                     }
                     if (calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
@@ -1025,6 +1007,19 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             return chosenVillage;
+        }
+
+        // Helper: Checks if the village has enough units
+        function isValidUnitsToSend(playerVillage, unitsToSend) {
+            for (const unitType in unitsToSend) {
+                const requiredUnits = unitsToSend[unitType];
+                const availableUnits = playerVillage[unitType] >= 0 ? playerVillage[unitType] : 0;
+
+                if (requiredUnits !== -1 && availableUnits < requiredUnits) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         // Helper: Subtracts units of a unitsToSubtract object from the given village

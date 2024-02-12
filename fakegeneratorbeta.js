@@ -165,8 +165,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
         const villageData = villageArrayToDict(villages);
 
-
-
         // Entry point
         (async function () {
             try {
@@ -508,15 +506,17 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 } else if (id.startsWith('keep')) {
                     sendOrKeep = 'units_to_keep';
                 }
+                const idParts = e.target.id.split('_');
+                const lastWord = idParts[idParts.length - 1];
 
-                // Ensure the input is at least 0
+                // Ensure the input is at least -1
                 const inputValue = parseInt(e.target.value) >= -1 ? parseInt(e.target.value) : 0;
 
                 jQuery(`#${e.target.id}`).val(inputValue);
 
                 // Use setLocalStorage to update unit value
                 let localStorageSettingsUnit = getLocalStorage();
-                localStorageSettingsUnit[sendOrKeep][e.target.defaultValue] = inputValue;
+                localStorageSettingsUnit[sendOrKeep][lastWord] = inputValue;
                 saveLocalStorage(localStorageSettingsUnit);
             }
 
@@ -621,8 +621,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             jQuery('#calculateFakes').on('click', async function (e) {
                 e.preventDefault();
 
+                clearButtons();
+
                 let playerVillages;
                 let targetCoords = [];
+                let unchangedTroopData;
 
                 targetCoords = jQuery('#CoordInput').val().trim().match(COORD_REGEX) ?? [];
                 if (targetCoords.length === 0) {
@@ -635,7 +638,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     console.debug(`${scriptInfo} Target coordinates: `, targetCoords);
                     console.debug(`${scriptInfo} worldConfig: `, worldConfig);
                     console.debug(`${scriptInfo} worldUnitInfo: `, worldUnitInfo);
-                    console.debug(`${scriptInfo} village.txt villages: `, villages); // Risky
+                    console.debug(`${scriptInfo} village.txt villages: `, villages);
                     console.debug(`${scriptInfo} Current URL: `, getCurrentURL());
                 }
 
@@ -649,10 +652,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     console.error(`${scriptInfo} Error:`, error);
                 }
 
+
                 for (let playerVillage of playerVillages) {
                     points = getVillagePointsFromCoord(playerVillage.coord)
                     playerVillage.points = points;
                 }
+                unchangedTroopData = JSON.parse(JSON.stringify(playerVillages));
 
                 if (DEBUG) {
                     console.debug(`${scriptInfo} Player villages with points: `, playerVillages);
@@ -665,23 +670,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     spySend = false;
                 }
 
-                calculateFakes(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), parseFloat(worldUnitInfo.config.catapult.speed), spySend);
+                calculateAttacks(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), worldUnitInfo.config, spySend, unchangedTroopData);
             });
         }
 
-        /*  Main calculation function
-            Input:
-            playerVillages
-            targetCoords
-            world_config (night[active, start_hour, end_hour], fakeLimit)
-            catSpeed 
-        */
-        function calculateFakes(playerVillages, targetCoords, nightInfo, fakeLimit, catSpeed, spySend) {
-            // Get start timestamp
+        function calculateAttacks(playerVillages, targetCoords, nightInfo, fakeLimit, configSpeed, spySend, unchangedTroopData) {
+            // Time to calculate calculation time
             let startTime = new Date().getTime();
-            let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, catSpeed, nightInfo, fakeLimit);
+            let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend);
 
-            //DEBUG information
             if (DEBUG) {
                 console.debug(`${scriptInfo} All calculated Combinations: `, allCombinations);
                 console.debug(`${scriptInfo} Amount of possible Combinations: `, amountOfCombinations);
@@ -691,23 +688,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 return;
             }
 
-            //Filter arrays less than 1 in length, meaning only containing the target village
+            //Filter arrays less than 1 in length, meaning only containing the target village and sorth them based on amount of player villages found
             if (DEBUG) console.debug(`${scriptInfo} Unfiltered length of allCombinations: ${allCombinations.length}`);
             allCombinations = allCombinations.filter((combination) => combination.length > 1);
-            // Sort allCombinations array based on the length of sub-arrays in ascending order
             allCombinations.sort((a, b) => a.length - b.length);
             let startingAmountOfComb = allCombinations.length;
             if (DEBUG) console.debug(`${scriptInfo} Filtered length of allCombinations: ${startingAmountOfComb}`);
-
-            /*
-            Filter Coordinates where no player villages has been found
-            Sort the array in ascending order of value length
-            Iterate over the found combinations in the array
-            If we have multiple player villages, get the one that is least often used for other future target coords and has been used the least
-            and push the coord combination to our result
-            If only one Player village has been found, just use that 
-            Then subtract the used amount of catapults from the villages catapults and if the village then does not have enough catapults for more fakes, remove it from the remaining arrays
-            */
 
             //Initializing map to count the usage of each playerVillage
             let usedPlayerVillages = new Map();
@@ -715,13 +701,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 usedPlayerVillages.set(village.villageId, 0);
             });
 
-            //Creating an empty array to store resulting pairs
             let calculatedFakePairs = [];
-
-            // Get counts beforehand and reuse it
             let counts = getCounts(allCombinations);
             let minCat;
-            const threshold = 0.10; // 10% threshold
+            const localStorageObject = getLocalStorage();
+            const unitSelectionType = localStorageObject.unit_selection_type;
+            const unitsToSend = localStorageObject.units_to_send;
+            const unitsToKeep = localStorageObject.units_to_keep;
+            const keepCatapults = localStorageObject.keep_catapults;
 
             while (allCombinations.length > 0) {
                 let combination = allCombinations.shift();;
@@ -729,57 +716,30 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (combination.length < 2) {
                     continue;
                 }
+                // Sort player villages
+                combination = sortPlayerVillages(combination, counts, usedPlayerVillages, allCombinations);
 
-                // Sort player villages if there are more than 1 player village for this targetCoord
-                if (combination.length > 2) {
-                    combination = [combination[0]].concat(combination.slice(1).sort((a, b) => {
-                        let villageIdA = a.villageId;
-                        let villageIdB = b.villageId;
-
-                        // The villages might not exist in counts
-                        let countA = counts.get(villageIdA) || 0;
-                        let countB = counts.get(villageIdB) || 0;
-
-                        // Get usage counts
-                        let usedCountA = usedPlayerVillages.get(villageIdA) || 0;
-                        let usedCountB = usedPlayerVillages.get(villageIdB) || 0;
-
-                        // The number of remaining targets
-                        let remainingTargets = allCombinations.length;
-
-                        // Compare usedPlayerVillage values if:
-                        // - Both counts are greater than the number of remaining targets
-                        // - The absolute difference between usedCounts is greater than 2
-                        // - And both counts are greater than 2
-                        if (((countA > remainingTargets * threshold && countB > remainingTargets * threshold) || Math.abs(usedCountA - usedCountB) > 1) && countA > 2 && countB > 2 && usedCountA != usedCountB) {
-                            return usedCountA - usedCountB; // Lower usedPlayerVillage is better.
-                        } else {
-                            // If not, then compare count values.
-                            return countA - countB; // Lower count is better.
-                        }
-                    }));
-                }
-
+                //Choose the most fitting village
                 let chosenVillage = null;
-                for (let j = 1; j < combination.length; j++) {
-                    let village = combination[j];
-                    minCat = getMinAmountOfCatapults(village.points, fakeLimit);
-                    // Considering spy amount if spySend is true,  catapult amount and if the pair is already in our results 
-                    if (village.catapult >= minCat && !(spySend && village.spy <= 0) && !calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
-                        chosenVillage = village;
-                        break;
-                    }
-                }
-
-                // If no valid village is found, skip to the next combination
+                chosenVillage = chooseVillage(combination, fakeLimit, spySend, calculatedFakePairs, usedPlayerVillages)
                 if (!chosenVillage) {
                     continue;
                 }
 
-                minCat = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
-                chosenVillage.catapult -= minCat;
-
-
+                // Remove used units from village
+                if (unitSelectionType == "manually") {
+                    subtractUnitsFromVillage(chosenVillage, unitsToSend);
+                } else if (unitSelectionType == "dynamically") {
+                    let unitObjectCatapult = createDefaultUnitsObject();
+                    unitObjectCatapult["catapult"] = keepCatapults;
+                    if (spySend) {
+                        unitObjectCatapult["spy"] = 1;
+                    }
+                    subtractUnitsFromVillage(chosenVillage, unitObjectCatapult);
+                } else {
+                    console.error("Invalid unit selection type", unitSelectionType)
+                    return;
+                }
                 calculatedFakePairs.push([chosenVillage, combination[0]]);
 
                 // Increment the used counter of the village we just used
@@ -794,16 +754,29 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     }
                 });
 
-                // Accounting for spy decrement when spySend is true
-                if (spySend && chosenVillage.spy > 0) {
-                    chosenVillage.spy -= 1;
-                }
-
-                if ((spySend && chosenVillage.spy < 1) || chosenVillage.catapult < minCat) {
-                    // loop through allCombinations and remove the chosenVillage from all its occurrences
-                    allCombinations = allCombinations.map(combination => {
-                        return combination.filter(element => element !== chosenVillage);
-                    });
+                // Remove used village if not enough remaining troops
+                if (unitSelectionType == "manually") {
+                    let isValidUnitsToSend = true;
+                    for (const unitType in unitsToSend) {
+                        if (unitsToSend[unitType] == -1 || chosenVillage[unitType] < unitsToSend[unitType]) {
+                            isValidUnitsToSend = false;
+                            break;
+                        }
+                    }
+                    if (!isValidUnitsToSend) {
+                        allCombinations = allCombinations.map(combination => {
+                            return combination.filter(element => element !== chosenVillage);
+                        });
+                    }
+                } else if (unitSelectionType == "dynamically") {
+                    if (chosenVillage.catapult < minCat || (spySend && chosenVillage.spy <= 0)) {
+                        allCombinations = allCombinations.map(combination => {
+                            return combination.filter(element => element !== chosenVillage);
+                        });
+                    }
+                } else {
+                    console.error("Invalid unit selection type", unitSelectionType)
+                    return;
                 }
             }
             if (DEBUG) console.debug(`${scriptInfo} Calculated fake pairs: ${calculatedFakePairs}`);
@@ -813,17 +786,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 for (let villageId of usedPlayerVillages.keys()) {
                     let usage = usedPlayerVillages.get(villageId);
                     villageUsages.push(usage);
-                    console.debug(`${scriptInfo} How often each village was used: ${villageId} : ${usage}`);
+                    // console.debug(`${scriptInfo} How often each village was used: ${villageId} : ${usage}`);
                 }
 
-                // Calculate the median
                 villageUsages.sort((a, b) => a - b);
-
                 let median;
                 let midIndex = Math.floor(villageUsages.length / 2);
-
-                // If the quantity of the elements is even, the median is the average of the two central elements
-                // Otherwise, it's the single central element
                 if (villageUsages.length % 2 === 0) {
                     median = (villageUsages[midIndex - 1] + villageUsages[midIndex]) / 2;
                 } else {
@@ -834,15 +802,22 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 console.debug(`${scriptInfo} Median usage of villages: ${median}`);
             }
             let generatedFakeLinks = [];
+            let unitObject = createDefaultUnitsObject();
+            if (spySend) {
+                unitObject["spy"] = 1;
+            }
             for (let pair of calculatedFakePairs) {
-                if (spySend) {
-                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 1));
+                if (unitSelectionType == "manually") {
+                    generatedFakeLinks.push(generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitsToSend, unchangedTroopData, unitsToKeep));
+                } else if (unitSelectionType == "dynamically") {
+                    unitObject["catapult"] = getMinAmountOfCatapults(pair[0].points, fakeLimit);
+                    generatedFakeLinks.push(generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitObject, unchangedTroopData, unitsToKeep));
                 } else {
-                    generatedFakeLinks.push(generateLink(pair[0], getVillageIdFromCoord(pair[1]), getMinAmountOfCatapults(pair[0].points, fakeLimit), 0));
+                    console.error("Invalid unit selection type", unitSelectionType)
+                    return;
                 }
             }
-
-            if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks}`);
+            if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks[0]}`);
             // Get end timestamp
             let endTime = new Date().getTime();
             if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${amountOfCombinations} possible combinations.`);
@@ -854,42 +829,273 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
 
         // All possible combinations of player village and target  coords with consideration of arrival time outside the night bonus and minimum catapult am
-        function getAllPossibleCombinations(playerVillages, targetCoords, unitSpeed, nightInfo, fakeLimit) {
+        function getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend) {
             let allCombinations = [];
             let currentTime = Date.now();
             let minCat = 1;
-            let validArrivalTime = false;
             let amountOfCombinations = 0;
             let distance;
             let travelTime;
+            let unitSpeed;
 
-            for (let targetCoord of targetCoords) {
-                let subArray = [targetCoord];
+            const localStorageObject = getLocalStorage();
+            const unitSelectionType = localStorageObject.unit_selection_type;
+            if (unitSelectionType === "manually") {
+                // Subtract units_to_keep from player villages 
+                const unitsToKeep = localStorageObject.units_to_keep;
+                const unitsToSend = localStorageObject.units_to_send;
+                unitSpeed = getSlowestSpeed(unitsToSend, configSpeed)
                 for (let playerVillage of playerVillages) {
-                    distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
-                    travelTime = twSDK.getTravelTimeInSecond(distance, unitSpeed) * 1000;
-                    // Check if arrival time would be in night bonus
-                    validArrivalTime = checkValidArrivalTime(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))
-                    // Check the minimum amount of needed catapults 
-                    minCat = getMinAmountOfCatapults(playerVillage.points, fakeLimit);
-                    // If the attack has a valid arrival time and the player village has enough catapults add it to our subArray
-                    if (validArrivalTime && playerVillage.catapult >= minCat) {
+                    subtractUnitsFromVillage(playerVillage, unitsToKeep);
+                }
+
+                for (let targetCoord of targetCoords) {
+                    let subArray = [targetCoord];
+                    for (let playerVillage of playerVillages) {
+                        const unitsToSend = localStorageObject.units_to_send;
+                        let isValidUnitsToSend = true;
+                        for (const unitType in unitsToSend) {
+                            if (unitsToSend[unitType] !== -1 && playerVillage[unitType] < unitsToSend[unitType]) {
+                                isValidUnitsToSend = false;
+                                break;
+                            }
+                        }
+                        if (!isValidUnitsToSend) {
+                            continue;
+                        }
+                        distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
+                        travelTime = twSDK.getTravelTimeInSecond(distance, unitSpeed) * 1000;
+                        if (!isTimestampInArrivalTimes((currentTime + travelTime))) {
+                            continue;
+                        }
+                        if (!checkArrivalTimeOutsideNightBonus(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))) {
+                            continue;
+                        }
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
+                    allCombinations.push(subArray);
                 }
-                allCombinations.push(subArray);
+
+
+            } else if (unitSelectionType === "dynamically") {
+                // Subtract units_to_keep from player villages 
+                const keepCatapults = localStorageObject.keep_catapults;
+                let unitObjectCatapult = createDefaultUnitsObject();
+                unitObjectCatapult["catapult"] = keepCatapults;
+                unitSpeed = configSpeed.catapult.speed;
+
+                for (let playerVillage of playerVillages) {
+                    subtractUnitsFromVillage(playerVillage, unitObjectCatapult);
+                }
+
+                for (let targetCoord of targetCoords) {
+                    let subArray = [targetCoord];
+                    for (let playerVillage of playerVillages) {
+                        distance = twSDK.calculateDistance(playerVillage.coord, targetCoord);
+                        travelTime = twSDK.getTravelTimeInSecond(distance, unitSpeed) * 1000;
+                        if (!isTimestampInArrivalTimes((currentTime + travelTime))) {
+                            continue;
+                        }
+                        if (!checkArrivalTimeOutsideNightBonus(parseInt(nightInfo.start_hour), parseInt(nightInfo.end_hour), (currentTime + travelTime))) {
+                            continue;
+                        }
+                        // Check the minimum amount of needed catapults 
+                        minCat = getMinAmountOfCatapults(playerVillage.points, fakeLimit);
+                        if (playerVillage.catapult < minCat) {
+                            continue;
+                        }
+                        if (spySend && playerVillage.spy <= 0) {
+                            continue;
+                        }
+                        subArray.push(playerVillage);
+                        amountOfCombinations += 1;
+                    }
+                    allCombinations.push(subArray);
+                }
+
+            } else {
+                console.error("Invalid unit selection type", unitSelectionType)
             }
             return { amountOfCombinations, allCombinations };
         }
 
-        // Helper: Function to generate a link from villageIds 
-        // 'https://de219.die-staemme.de/game.php?village=48766&screen=place&spy=1&catapult=14&x=472&y=523&
-        function generateLink(village1, villageId2, catAmount, spyAmount) {
-            completeLink = ""
-            completeLink += getCurrentURL();
-            completeLink += `?village=${village1.villageId}&screen=place&target=${villageId2}&spy=${spyAmount}&catapult=${catAmount}`;
+        function sortPlayerVillages(combination, counts, usedPlayerVillages, allCombinations) {
+            const threshold = 0.10; // 10% threshold
+            const localStorageObject = getLocalStorage();
+            const maxAttacksFromVillage = localStorageObject.max_attacks_per_village;
+            if (parseInt(maxAttacksFromVillage) == 0) {
+                return [combination[0]].concat(combination.slice(1).sort((a, b) => {
+                    let villageIdA = a.villageId;
+                    let villageIdB = b.villageId;
+
+                    let countA = counts.get(villageIdA);
+                    let countB = counts.get(villageIdB);
+
+                    let usedCountA = usedPlayerVillages.get(villageIdA);
+                    let usedCountB = usedPlayerVillages.get(villageIdB);
+
+                    let remainingTargets = allCombinations.length;
+
+                    // Compare usedPlayerVillage values if:
+                    // - Both counts are greater than the number of remaining targets
+                    // - The absolute difference between usedCounts is greater than 2
+                    // - And both counts are greater than 2
+                    if (((countA > remainingTargets * threshold && countB > remainingTargets * threshold) || Math.abs(usedCountA - usedCountB) > 1) && countA > 2 && countB > 2 && usedCountA != usedCountB) {
+                        return usedCountA - usedCountB; // Lower usedPlayerVillage is better.
+                    } else {
+                        // If not, then compare count values.
+                        return countA - countB; // Lower count is better.
+                    }
+                }));
+            } else if (parseInt(maxAttacksFromVillage) > 0) {
+                return [combination[0]].concat(combination.slice(1).sort((a, b) => {
+                    let villageIdA = a.villageId;
+                    let villageIdB = b.villageId;
+
+                    let countA = counts.get(villageIdA);
+                    let countB = counts.get(villageIdB);
+
+                    let usedCountA = usedPlayerVillages.get(villageIdA);
+                    let usedCountB = usedPlayerVillages.get(villageIdB);
+
+                    if (countA == countB) {
+                        return usedCountA - usedCountB;
+                    } else {
+                        return countA - countB;
+                    }
+                }));
+            } else {
+                console.error("Invalid max_attacks_per_village", maxAttacksFromVillage)
+                return combination;
+            }
+        }
+
+        function chooseVillage(combination, fakeLimit, spySend, calculatedFakePairs, usedPlayerVillages) {
+            const localStorageObject = getLocalStorage();
+            const unitSelectionType = localStorageObject.unit_selection_type;
+            const unitsToSend = localStorageObject.units_to_send;
+            const maxAttacksFromVillage = localStorageObject.max_attacks_per_village;
+
+            let chosenVillage = null;
+            if (unitSelectionType == "manually") {
+                for (let j = 1; j < combination.length; j++) {
+                    let village = combination[j];
+                    if (usedPlayerVillages.get(village.villageId) >= maxAttacksFromVillage && maxAttacksFromVillage > 0) {
+                        continue;
+                    }
+                    let isValidUnitsToSend = true;
+                    for (const unitType in unitsToSend) {
+                        if (unitsToSend[unitType] !== -1 && village[unitType] < unitsToSend[unitType]) {
+                            isValidUnitsToSend = false;
+                            break;
+                        }
+                    }
+                    if (!isValidUnitsToSend) {
+                        continue;
+                    }
+                    if (calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
+                        continue;
+                    }
+                    chosenVillage = village;
+                    break;
+                }
+            } else if (unitSelectionType == "dynamically") {
+                for (let j = 1; j < combination.length; j++) {
+                    let village = combination[j];
+                    if (usedPlayerVillages.get(village.villageId) >= maxAttacksFromVillage && maxAttacksFromVillage > 0) {
+                        continue;
+                    }
+                    const minCat = getMinAmountOfCatapults(village.points, fakeLimit);
+                    if (!(village.catapult >= minCat)) {
+                        continue;
+                    }
+                    if (calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
+                        continue;
+                    }
+                    if (spySend && village.spy <= 0) {
+                        continue;
+                    }
+                    chosenVillage = village;
+                    break;
+                }
+            } else {
+                console.error("Invalid unit selection type", unitSelectionType)
+            }
+
+            return chosenVillage;
+        }
+
+        // Helper: Subtracts units of a unitsToSubtract object from the given village
+        function subtractUnitsFromVillage(playerVillage, unitsToSubtract) {
+            for (const unitType in unitsToSubtract) {
+                if (unitsToSubtract[unitType] == 0) {
+                    continue;
+                }
+                if (playerVillage.hasOwnProperty(unitType)) {
+                    if (unitsToSubtract[unitType] === -1) {
+                        // All of the units are sent
+                        playerVillage[unitType] = 0;
+                    } else {
+                        playerVillage[unitType] -= unitsToSubtract[unitType];
+                    }
+                } else {
+                    console.error("Saved unit type not found! This should never happen!", unitType);
+                }
+            }
+        }
+        //Helper: Creates a default units object
+        function createDefaultUnitsObject() {
+            const defaultUnitsObject = {};
+            const gameDataUnits = game_data.units;
+
+            for (const unitType of gameDataUnits) {
+                defaultUnitsObject[unitType] = 0;
+            }
+
+            return defaultUnitsObject;
+        }
+
+        // Helper: Function to generate a link from villageIds
+        function generateLink(villageId1, villageId2, unitObject, unchangedTroopData, unitsToKeep) {
+            let completeLink = getCurrentURL();
+            completeLink += `?village=${villageId1}&screen=place&target=${villageId2}`;
+            let unitAmount;
+
+            const villageData = unchangedTroopData.find(village => village.villageId == villageId1);
+
+            if (!villageData) {
+                console.error("Village not found in unchangedTroopData", villageId1, unchangedTroopData);
+                return;
+            }
+            for (const unitType in unitObject) {
+                if (unitObject[unitType] > 0) {
+                    // If the value is greater than 0, append to the link
+                    completeLink += `&${unitType}=${unitObject[unitType]}`;
+                } else if (unitObject[unitType] === -1) {
+                    // If the value is -1, use the value from unchangedTroopData if available
+                    if (unitsToKeep[unitType] >= 0) {
+                        unitAmount = villageData[unitType] - unitsToKeep[unitType];
+                    } else {
+                        unitAmount = 0;
+                        console.error("Too many -1, idk whats going on")
+                    }
+                    completeLink += `&${unitType}=${unitAmount}`;
+                }
+            }
             return completeLink;
+        }
+
+        // Helper: Returns the slowest unit speed of the units to send
+        function getSlowestSpeed(unitsToSend, unitInfo) {
+            const unitSpeeds = [];
+            for (const unitType in unitsToSend) {
+                if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
+                    const speed = unitInfo[unitType]?.speed || 0;
+                    unitSpeeds.push(speed);
+                }
+            }
+            return Math.max(...unitSpeeds, 0); // Return the highest speed, or 0 if the array is empty
         }
 
         // Helper: Villages array to dictionary, to quickly search with coordinates
@@ -957,8 +1163,23 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
+        function isTimestampInArrivalTimes(timestamp) {
+            const localStorageObject = getLocalStorage();
+            const arrivalTimes = localStorageObject.arrival_times;
+            if (arrivalTimes.length === 0) {
+                return true;
+            }
+            for (const [start, end] of arrivalTimes) {
+                if (timestamp >= start && timestamp <= end) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         // Helper: Checks if the arrival time is in the night bonus or not
-        function checkValidArrivalTime(start_hour, end_hour, timestamp) {
+        function checkArrivalTimeOutsideNightBonus(start_hour, end_hour, timestamp) {
             const time = new Date(timestamp);
             const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
@@ -974,6 +1195,16 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
+        function clearButtons() {
+            // Fetch the 'open_tabs' div where buttons will be appended
+            let openTabsDiv = document.getElementById("open_tabs");
+
+            // Reset the buttons
+            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>`;
+            // Make the 'open_tabs' div visible
+            openTabsDiv.style.display = "none";
+        }
+
         function createSendButtons(URIs) {
             // Get the number of attacks per button
             let nrSplit = parseInt(getLocalStorage().attack_per_button);
@@ -984,7 +1215,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let openTabsDiv = document.getElementById("open_tabs");
 
             // Reset the buttons
-            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>`;
+            clearButtons();
 
             // Calculate the number of required buttons
             let nrButtons = Math.ceil(URIs.length / nrSplit);
@@ -1355,6 +1586,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     defaultSettings.units_to_send[unit] = 0;
                     defaultSettings.units_to_keep[unit] = 0;
                 });
+                saveLocalStorage(defaultSettings);
 
                 return defaultSettings;
             }
@@ -1381,8 +1613,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
         }
 
-        // Copied and edited from twSDK to be able to call it twice and get different IDs
-        // Please implement into SDK somehow
+        // Copied and edited from twSDK to be able to call it twice and get different IDs and to not have the checked stuff
+        // Some cleaned up version of this should be in the sdk probably
         function buildUnitsPicker(unitsToIgnore, id_prefix, type = 'checkbox') {
             let unitsTable = ``;
 

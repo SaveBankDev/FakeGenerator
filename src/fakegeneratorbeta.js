@@ -286,7 +286,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
                 .add-entry-btn {
                     padding: 10px;
-                    font-size: 14px;
+                    font-size: 17px;
                     color: white;
                     background: #0bac00;
                     background: linear-gradient(to bottom, #0bac00 0%,#0e7a1e 100%);
@@ -304,15 +304,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 .delete-entry-btn:hover {
                     text-decoration: underline; 
                 }
-                .sb-arrival-time {
-                    background-color: #fff5da;
-                    border: 1px solid #c1a264; 
-                    border-radius: 4px; 
-                    padding: 10px; 
-                    display: grid;
-                    grid-column-gap: 10px; 
-                    align-items: center; 
-                }
                 .deleteAllEntries {
                     padding: 8px;
                     font-size: 11.5px;
@@ -327,7 +318,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 .sb-mb5 {
                     margin-bottom: 5px !important;
                 }
-                .add-entry-btn:hover {
+                #addTimeEntry:hover {
                     background: #13c600;
                     background: linear-gradient(to bottom, #13c600 0%,#129e23 100%);
                 }
@@ -602,8 +593,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             });
             initializeSavedEntries()
             jQuery('#arrivalEntryTable').on('click', '.delete-entry-btn', function () {
-                const startTime = new Date(jQuery(this).parent().siblings('.entry-start').text()).getTime();
-                const endTime = new Date(jQuery(this).parent().siblings('.entry-end').text()).getTime();
+                const idParts = this.id.split('-');
+                const startTime = Number(idParts[1]);
+                const endTime = Number(idParts[2]);
 
                 const updatedLocalStorage = getLocalStorage();
                 updatedLocalStorage.arrival_times = updatedLocalStorage.arrival_times.filter(timeSpan => !(timeSpan[0] === startTime && timeSpan[1] === endTime));
@@ -646,7 +638,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         const newEntryRow = jQuery('<tr class="entry-row"></tr>');
                         newEntryRow.append(`<td class="entry-start">${formatLocalizedTime(new Date(startTime))}</td>`);
                         newEntryRow.append(`<td class="entry-end">${formatLocalizedTime(new Date(endTime))}</td>`);
-                        newEntryRow.append('<td class="ra-tac"><button class="delete-entry-btn">X</button></td>');
+                        newEntryRow.append(`<td class="ra-tac"><button class="delete-entry-btn" id="btn-${startTime}-${endTime}">X</button></td>`);
                         jQuery('#arrivalEntryTable').append(newEntryRow);
 
                         // Make the table visible if it has at least one entry
@@ -910,7 +902,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // All possible combinations of player village and target  coords with consideration of arrival time outside the night bonus and minimum catapult am
         function getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend) {
-            let startTime = new Date().getTime();
             let allCombinations = [];
             let currentTime = Date.now();
             let minCat = 1;
@@ -929,7 +920,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const keepCatapults = localStorageObject.keep_catapults;
             const arrivalTimes = localStorageObject.arrival_times;
             let playerVillagesWithEnoughUnits = [];
-            console.log("Time to init: ", new Date().getTime() - startTime);
             if (unitSelectionType === "manually") {
                 // Subtract units_to_keep from player villages 
                 unitSpeed = getSlowestSpeed(unitsToSend, configSpeed)
@@ -939,7 +929,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         playerVillagesWithEnoughUnits.push(playerVillage);
                     }
                 }
-                console.log("Time to unit subtract and sort out: ", new Date().getTime() - startTime);
                 for (let targetCoord of targetCoords) {
                     let subArray = [targetCoord];
                     for (let playerVillage of playerVillagesWithEnoughUnits) {
@@ -975,7 +964,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         amountOfCombinations += 1;
                     }
                     allCombinations.push(subArray);
-                    // console.log("Time to added array: ", new Date().getTime() - startTime, allCombinations.length);
                 }
 
 
@@ -995,7 +983,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     }
                     playerVillagesWithEnoughUnits.push(playerVillage);
                 }
-                console.log("Time to unit subtract and sort out: ", new Date().getTime() - startTime);
                 for (let targetCoord of targetCoords) {
                     let subArray = [targetCoord];
                     for (let playerVillage of playerVillages) {
@@ -1695,7 +1682,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     newEntryRow.innerHTML = `
                 <td class="entry-start">${startTime}</td>
                 <td class="entry-end">${endTime}</td>
-                <td class="ra-tac"><button class="delete-entry-btn" data-index="${index}">X</button></td>
+                <td class="ra-tac"><button class="delete-entry-btn" id="btn-${timeSpan[0]}-${timeSpan[1]}">X</button></td>
             `;
 
                     entriesTable.appendChild(newEntryRow);
@@ -1705,7 +1692,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             document.getElementById('arrivalTimeFieldset').appendChild(entriesTable);
-
         }
 
         function getLastMatch(inputString) {

@@ -76,7 +76,13 @@ var scriptConfig = {
             'Coordinates': 'Coordinates',
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
-
+            'Reset Input': 'Reset Input',
+            'Invalid entry. Please check the selected times.': 'Invalid entry. Please check the selected times.',
+            'Invalid entry. Please select valid start and end times.': 'Invalid entry. Please select valid start and end times.',
+            'This entry already exists.': 'This entry already exists.',
+            'From': 'From',
+            'To': 'To',
+            'Delete Entry': 'Delete Entry',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -104,7 +110,14 @@ var scriptConfig = {
             'Enter units to keep (-1 for all troops)': 'Zu behaltende Truppen eingeben (-1 für alle Truppen)',
             'Coordinates': 'Koordinaten',
             'Delete all arrival times': 'Alle Ankunftszeiten löschen',
-            'Arrival time': 'Ankunftszeiten'
+            'Arrival time': 'Ankunftszeiten',
+            'Reset Input': 'Eingaben zurücksetzen',
+            'Invalid entry. Please check the selected times.': 'Ungültiger Eintrag. Bitte überprüfen Sie die Zeiten.',
+            'Invalid entry. Please select valid start and end times.': 'Ungültiger Eintrag. Bitte gültige Start- und Endzeiten auswählen.',
+            'This entry already exists.': 'Dieser Eintrag existiert bereits.',
+            'From': 'Von',
+            'To': 'Bis',
+            'Delete Entry': 'Eintrag löschen',
         }
     },
     allowedMarkets: [],
@@ -215,8 +228,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 </div>
             </div>`;
             const style = `
-            <style>
-                .fake-generator .btn-confirm-yes { padding: 3px; margin: 5px; }
                 .btn-confirm-clicked { background: #666 !important; }
                 .ra-textarea::placeholder {
                     font-size: 15px; 
@@ -284,16 +295,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     border-radius: 3px;
                     cursor: pointer;
                 }
-                .add-entry-btn:hover {
-                    background: #13c600;
-                    background: linear-gradient(to bottom, #13c600 0%,#129e23 100%);
-                }
-                .delete-entry-btn {
-                    cursor: pointer;
-                    color: red; 
-                    font-weight: bold; 
-                }
-                
+                .add-entry-btn, .deleteAllEntries {
+                    width: 90%;
+                    height: 40px;
+                    display: inline-block;
+                    text-align: center;
+                }                
                 .delete-entry-btn:hover {
                     text-decoration: underline; 
                 }
@@ -306,21 +313,66 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     grid-column-gap: 10px; 
                     align-items: center; 
                 }
-                #deleteAllEntries {
+                .deleteAllEntries {
                     padding: 8px;
                     font-size: 11.5px;
                     font-weight: bold;
                     background: #af281d;
                     background: linear-gradient(to bottom, #af281d 0%,#801006 100%);
                 }
-                #deleteAllEntries:hover {
+                .deleteAllEntries:hover {
                     background: #c92722;
                     background: linear-gradient(to bottom, #c92722 0%,#a00d08 100%);
                 }
                 .sb-mb5 {
                     margin-bottom: 5px !important;
                 }
-            </style>`;
+                .add-entry-btn:hover {
+                    background: #13c600;
+                    background: linear-gradient(to bottom, #13c600 0%,#129e23 100%);
+                }
+                .entries-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                }
+                .entries-table th {
+                    background-color: #f2f2f2;
+                    text-align: left;
+                    padding: 10px;
+                }
+                .entries-table td {
+                    border: 1px solid #ddd;
+                    padding: 8px;
+                }
+                .entry-row:nth-child(even) {
+                    background-color: ##f0e2be;
+                }
+                .entry-row:nth-child(odd) {
+                    background-color: #fff5da;
+                }
+                .entry-start, .entry-end {
+                    text-align: center;
+                }
+                .delete-entry-btn {
+                    width: 30%;
+                    height: 50%;
+                    padding: 10px;
+                    border: 1px solid black;
+                    border-radius: 3px;
+                    color: white;
+                    cursor: pointer;
+                    font-weight: bold;
+                    background: #af281d;
+                    background: linear-gradient(to bottom, #af281d 0%,#801006 100%);
+                    padding: 0;
+
+                }
+                .delete-entry-btn:hover {
+                    background: #c92722;
+                    background: linear-gradient(to bottom, #c92722 0%,#a00d08 100%);
+                }
+
+            `;
 
             twSDK.renderBoxWidget(
                 content,
@@ -537,19 +589,37 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 saveLocalStorage(localStorageSettingsCoordInput);
             });
             jQuery('#deleteAllEntries').on('click', function () {
-                // Remove all entries with the class sb-arrival-time
-                jQuery('.sb-arrival-time').remove();
+                // Remove all entries in the table with the id arrivalEntryTable
+                jQuery('#arrivalEntryTable .entry-row').remove();
 
                 // Clear saved times in local storage
                 const localStorageObject = getLocalStorage();
                 localStorageObject.arrival_times = [];
                 saveLocalStorage(localStorageObject);
+
+                // Make the table invisible
+                jQuery('#arrivalEntryTable').css('display', 'none');
             });
             initializeSavedEntries()
+            jQuery('#arrivalEntryTable').on('click', '.delete-entry-btn', function () {
+                const startTime = new Date(jQuery(this).parent().siblings('.entry-start').text()).getTime();
+                const endTime = new Date(jQuery(this).parent().siblings('.entry-end').text()).getTime();
+
+                const updatedLocalStorage = getLocalStorage();
+                updatedLocalStorage.arrival_times = updatedLocalStorage.arrival_times.filter(timeSpan => !(timeSpan[0] === startTime && timeSpan[1] === endTime));
+                saveLocalStorage(updatedLocalStorage);
+
+                jQuery(this).parent().parent().remove();
+
+                // Hide the table if there are no entries
+                if (updatedLocalStorage.arrival_times.length === 0) {
+                    jQuery('#arrivalEntryTable').css('display', 'none');
+                }
+            });
             jQuery('#addTimeEntry').on('click', async function (e) {
                 e.preventDefault();
 
-                // Logic to validate and add new entry into the fieldset with the id arrivalTimeFieldset
+                // Logic to validate and add new entry into the table with the id arrivalEntryTable
                 const startTimeString = jQuery('#startDateTime').val();
                 const endTimeString = jQuery('#endDateTime').val();
 
@@ -564,8 +634,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         const isDuplicate = localStorageObject.arrival_times.some(timeSpan => isEqual(timeSpan, [startTime, endTime]));
 
                         if (isDuplicate) {
-                            // Entry already exists, do nothing and return
-                            console.log('Entry already exists.');
+                            UI.ErrorMessage(`${twSDK.tt('This entry already exists.')}`);
                             return;
                         }
 
@@ -573,30 +642,37 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         localStorageObject.arrival_times.push([startTime, endTime]);
                         saveLocalStorage(localStorageObject);
 
-                        // Create a new <div class="sb-grid sb-grid-5 sb-arrival-time"> for the new entry
-                        const newEntryDiv = jQuery('<div class="sb-grid sb-grid-5 sb-arrival-time ra-mb10"></div>');
-                        newEntryDiv.append(`<div>${formatLocalizedTime(new Date(startTime))}</div>`);
-                        newEntryDiv.append(`<div>${formatLocalizedTime(new Date(endTime))}</div>`);
-                        newEntryDiv.append('<div class="delete-entry-btn">X</div>');
-                        newEntryDiv.append('<div></div>'); // Empty div
-                        newEntryDiv.append('<div></div>'); // Empty div
-                        jQuery('#arrivalTimeFieldset').append(newEntryDiv);
+                        // Create a new row for the new entry
+                        const newEntryRow = jQuery('<tr class="entry-row"></tr>');
+                        newEntryRow.append(`<td class="entry-start">${formatLocalizedTime(new Date(startTime))}</td>`);
+                        newEntryRow.append(`<td class="entry-end">${formatLocalizedTime(new Date(endTime))}</td>`);
+                        newEntryRow.append('<td class="ra-tac"><button class="delete-entry-btn">X</button></td>');
+                        jQuery('#arrivalEntryTable').append(newEntryRow);
+
+                        // Make the table visible if it has at least one entry
+                        jQuery('#arrivalEntryTable').css('display', 'table');
 
                         // Event handler for the delete entry button
-                        newEntryDiv.find('.delete-entry-btn').on('click', function () {
-                            newEntryDiv.remove();
+                        newEntryRow.find('.delete-entry-btn').on('click', function () {
+                            newEntryRow.remove();
                             const updatedLocalStorage = getLocalStorage();
                             updatedLocalStorage.arrival_times = updatedLocalStorage.arrival_times.filter(timeSpan => !isEqual(timeSpan, [startTime, endTime]));
                             saveLocalStorage(updatedLocalStorage);
+
+                            // Hide the table if there are no entries
+                            if (updatedLocalStorage.arrival_times.length === 0) {
+                                jQuery('#arrivalEntryTable').css('display', 'none');
+                            }
                         });
                     } else {
-                        // Invalid entry, handle accordingly (e.g., show an error message)
-                        console.log('Invalid entry. Please check the selected times.');
+                        UI.ErrorMessage(`${twSDK.tt('Invalid entry. Please select valid start and end times.')}`);
                     }
                 } else {
-                    // Invalid entry, handle accordingly (e.g., show an error message)
-                    console.log('Invalid entry. Please select both start and end times.');
+                    UI.ErrorMessage(`${twSDK.tt('Invalid entry. Please check the selected times.')}`);
                 }
+            });
+            jQuery('#resetInput').on('click', function () {
+                resetInput();
             });
             // For the Calculate Fakes Button
             jQuery('#calculateFakes').on('click', async function (e) {
@@ -1472,9 +1548,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             <button type="button" class="add-entry-btn" id="addTimeEntry">+</button>
                         </div>
                         <div>
-                            <button type="button" class="add-entry-btn" id="deleteAllEntries">${twSDK.tt("Delete all arrival times")}</button>
+                            <button type="button" class="add-entry-btn deleteAllEntries" id="deleteAllEntries">${twSDK.tt("Delete all arrival times")}</button>
                         </div>
-                        <div></div>
+                        <div class="ra-tac">
+                            <button id="resetInput" class="add-entry-btn deleteAllEntries" >${twSDK.tt('Reset Input')}</button>
+                        </div>
                     </div>
                 </fieldset>
             `;
@@ -1589,32 +1667,45 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Function to initialize date and time entries from local storage
         function initializeSavedEntries() {
             const localStorageObject = getLocalStorage();
-            const arrivalTimes = localStorageObject.arrival_times;
+            const { arrival_times } = localStorageObject;
 
-            if (arrivalTimes && arrivalTimes.length > 0) {
-                // Iterate through saved arrival times and create entries
-                for (const timeSpan of arrivalTimes) {
+            const entriesTable = document.createElement('table');
+            entriesTable.classList.add('entries-table');
+            entriesTable.id = 'arrivalEntryTable';
+
+            // Add table headers
+            const headerRow = document.createElement('tr');
+            headerRow.innerHTML = `
+        <th class="ra-tac">${twSDK.tt('From')}</th>
+        <th class="ra-tac">${twSDK.tt('To')}</th>
+        <th class="ra-tac">${twSDK.tt('Delete Entry')}</th>
+    `;
+            entriesTable.appendChild(headerRow);
+
+            if (arrival_times && arrival_times.length > 0) {
+                entriesTable.style.display = 'table'; // Make the table visible
+
+                arrival_times.forEach((timeSpan, index) => {
+                    const newEntryRow = document.createElement('tr');
+                    newEntryRow.classList.add('entry-row');
+
                     const startTime = formatLocalizedTime(new Date(timeSpan[0]));
                     const endTime = formatLocalizedTime(new Date(timeSpan[1]));
 
-                    // Create a new entry div
-                    const newEntryDiv = jQuery('<div class="sb-grid sb-grid-5 sb-arrival-time"></div>');
-                    newEntryDiv.append(`<div>${startTime}</div>`);
-                    newEntryDiv.append(`<div>${endTime}</div>`);
-                    newEntryDiv.append('<div class="delete-entry-btn">X</div>');
-                    newEntryDiv.append('<div></div>'); // Empty div
-                    newEntryDiv.append('<div></div>'); // Empty div
-                    jQuery('#arrivalTimeFieldset').append(newEntryDiv);
+                    newEntryRow.innerHTML = `
+                <td class="entry-start">${startTime}</td>
+                <td class="entry-end">${endTime}</td>
+                <td class="ra-tac"><button class="delete-entry-btn" data-index="${index}">X</button></td>
+            `;
 
-                    // Event handler for the delete entry button
-                    newEntryDiv.find('.delete-entry-btn').on('click', function () {
-                        newEntryDiv.remove();
-                        const updatedLocalStorage = getLocalStorage();
-                        updatedLocalStorage.arrival_times = updatedLocalStorage.arrival_times.filter(savedTimeSpan => !isEqual(savedTimeSpan, timeSpan));
-                        saveLocalStorage(updatedLocalStorage);
-                    });
-                }
+                    entriesTable.appendChild(newEntryRow);
+                });
+            } else {
+                entriesTable.style.display = 'none'; // Hide the table if there are no entries
             }
+
+            document.getElementById('arrivalTimeFieldset').appendChild(entriesTable);
+
         }
 
         function getLastMatch(inputString) {
@@ -1627,6 +1718,38 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             return lastMatch;
+        }
+
+        function resetInput() {
+            const defaultSettings = {
+                chosen_group: 0,
+                attack_per_button: DEFAULT_ATTACKS_PER_BUTTON,
+                delay: DEFAULT_DELAY,
+                unit_selection_type: 'dynamically',
+                max_attacks_per_village: DEFAULT_MAX_ATTACKS_PER_VILLAGE,
+                send_spy: 'yes',
+                keep_catapults: 0,
+                units_to_send: {},
+                units_to_keep: {},
+                arrival_times: [],
+                target_coordinates: []
+            };
+
+            // Initialize units_to_send and units_to_keep with each unit set to 0
+            game_data.units.forEach(unit => {
+                defaultSettings.units_to_send[unit] = 0;
+                defaultSettings.units_to_keep[unit] = 0;
+            });
+
+
+
+            saveLocalStorage(defaultSettings);
+            const fakeGeneratorDiv = document.getElementById('FakeGenerator');
+            if (fakeGeneratorDiv) {
+                fakeGeneratorDiv.remove();
+            }
+            renderUI();
+            addEventHandlers();
         }
 
         // Service: Function to get settings from localStorage

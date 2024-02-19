@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.0
-* Last Updated: 2024-01-14
+* Version: v2.1
+* Last Updated: 2024-02-19
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -43,7 +43,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.0',
+        version: 'v2.1',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -77,34 +77,6 @@ var scriptConfig = {
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
 
-        },
-        en_US: {
-            'Redirecting...': 'Redirecting...',
-            Help: 'Help',
-            'Fake Generator': 'Fake Generator',
-            'Group': 'Group',
-            'Attacks per Button': 'Attacks per Button',
-            'There was an error!': 'There was an error!',
-            'Calculate Fakes': 'Calculate Fakes',
-            'Insert target coordinates here': 'Insert target coordinates here',
-            'No target coordinates!': 'No target coordinates!',
-            'There was an error while fetching the data!': 'There was an error while fetching the data!',
-            'Send Spy?': 'Send Spy?',
-            'Yes': 'Yes',
-            'No': 'No',
-            'No Fakes possible!': 'No Fakes possible!',
-            'Loading...': 'Loading...',
-            'Delay when opening tabs (in ms)': 'Delay when opening tabs (in ms)',
-            'Max Attacks per Village (0 ignores this setting)': 'Max Attacks per Village (0 ignores this setting)',
-            'dynamically': 'Dynamically',
-            'manually': 'Manually',
-            'Unit selection': 'Unit selection',
-            'Keep Catapults': 'Keep Catapults',
-            'Enter units to send (-1 for all troops)': 'Enter units to send (-1 for all troops)',
-            'Enter units to keep (-1 for all troops)': 'Enter units to keep (-1 for all troops)',
-            'Coordinates': 'Coordinates',
-            'Delete all arrival times': 'Delete all arrival times',
-            'Arrival time': 'Arrival time',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',

@@ -1448,7 +1448,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
             const units = game_data.units;
             let contentManualUnitSelection = "";
-            const unitsToIgnore = ['militia', 'knight', 'snob'];
+            const unitsToIgnore = ['militia', 'snob'];
             let unitTableSend = buildUnitsPicker(unitsToIgnore, "send", 'number');
             let unitTableKeep = buildUnitsPicker(unitsToIgnore, "keep", 'number');
 

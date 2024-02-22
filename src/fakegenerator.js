@@ -10,6 +10,8 @@
 * Mod: RedAlert
 */
 
+const { get } = require("http");
+
 
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
@@ -787,7 +789,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     subtractUnitsFromVillage(chosenVillage, unitsToSend);
                 } else if (unitSelectionType == "dynamically") {
                     let unitObjectCatapult = createDefaultUnitsObject();
-                    unitObjectCatapult["catapult"] = keepCatapults;
+                    unitObjectCatapult["catapult"] = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
                     if (spySend) {
                         unitObjectCatapult["spy"] = 1;
                     }

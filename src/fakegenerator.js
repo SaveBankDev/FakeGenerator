@@ -1155,7 +1155,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Helper: Function to generate a link from villageIds
         function generateLink(villageId1, villageId2, unitObject, unchangedTroopData, unitsToKeep) {
             let completeLink = getCurrentURL();
-            completeLink += `?village=${villageId1}&screen=place&target=${villageId2}`;
+            completeLink += `${twSDK.sitterId}?village=${villageId1}&screen=place&target=${villageId2}`;
             let unitAmount;
 
             const villageData = unchangedTroopData.find(village => village.villageId == villageId1);

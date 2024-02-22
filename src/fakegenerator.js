@@ -10,8 +10,6 @@
 * Mod: RedAlert
 */
 
-const { get } = require("http");
-
 
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;

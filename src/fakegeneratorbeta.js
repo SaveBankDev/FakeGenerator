@@ -324,19 +324,21 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
                 .entries-table {
                     width: 100%;
-                    border-collapse: collapse;
+                    border-collapse: separate; /* Change to separate to enable border-spacing */
+                    border-spacing: 10px 0; /* Add horizontal spacing */
                 }
                 .entries-table th {
                     background-color: #f2f2f2;
                     text-align: left;
                     padding: 10px;
+                    border: 1px solid #ddd; /* Add a border to create a gap effect */
                 }
                 .entries-table td {
                     border: 1px solid #ddd;
                     padding: 8px;
                 }
                 .entry-row:nth-child(even) {
-                    background-color: ##f0e2be;
+                    background-color: #f0e2be;
                 }
                 .entry-row:nth-child(odd) {
                     background-color: #fff5da;

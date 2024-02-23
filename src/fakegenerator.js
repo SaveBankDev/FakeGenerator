@@ -83,6 +83,7 @@ var scriptConfig = {
             'From': 'From',
             'To': 'To',
             'Delete Entry': 'Delete Entry',
+            'Open Tabs': 'Open Tabs',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -118,6 +119,7 @@ var scriptConfig = {
             'From': 'Von',
             'To': 'Bis',
             'Delete Entry': 'Eintrag löschen',
+            'Open Tabs': 'Tabs öffnen',
         }
     },
     allowedMarkets: [],
@@ -222,7 +224,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             </div>
             <div>
                 <div id="open_tabs" style="display: none;" class="ra-mb10">
-                    <h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>
+                    <h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>
                 </div>
             </div>`;
             const style = `

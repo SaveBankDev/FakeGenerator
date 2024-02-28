@@ -1273,7 +1273,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let openTabsDiv = document.getElementById("open_tabs");
 
             // Reset the buttons
-            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>`;
+            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>`;
             // Make the 'open_tabs' div visible
             openTabsDiv.style.display = "none";
         }

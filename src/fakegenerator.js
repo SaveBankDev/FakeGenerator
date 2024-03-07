@@ -90,7 +90,7 @@ var scriptConfig = {
             Help: 'Hilfe',
             'Fake Generator': 'Fake Generator',
             'Group': 'Gruppe',
-            'Attacks per Button': 'Angriffe pro Buttton',
+            'Attacks per Button': 'Angriffe pro Button',
             'There was an error!': 'Es gab einen Fehler!',
             'Calculate Fakes': 'Berechne Fakes',
             'Insert target coordinates here': 'Zielkoordinaten hier einfuegen',

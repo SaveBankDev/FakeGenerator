@@ -1120,6 +1120,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (requiredUnits !== -1 && availableUnits < requiredUnits) {
                     return false;
                 }
+                if (requiredUnits === -1 && availableUnits < 0) {
+                    return false;
+                }
             }
             return true;
         }

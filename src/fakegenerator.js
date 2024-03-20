@@ -1113,18 +1113,18 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Checks if the village has enough units
         function isValidUnitsToSend(playerVillage, unitsToSend) {
+            atLeatsOneUnit = false;
             for (const unitType in unitsToSend) {
                 const requiredUnits = unitsToSend[unitType];
-                const availableUnits = playerVillage[unitType] >= 0 ? playerVillage[unitType] : 0;
-
+                const availableUnits = playerVillage[unitType];
+                if ((requiredUnits === -1 && availableUnits > 0) || (requiredUnits > 0 && availableUnits >= requiredUnits)) {
+                    atLeatsOneUnitToSend = true;
+                }
                 if (requiredUnits !== -1 && availableUnits < requiredUnits) {
                     return false;
                 }
-                if (requiredUnits === -1 && availableUnits < 0) {
-                    return false;
-                }
             }
-            return true;
+            return atLeatsOneUnit;
         }
 
         // Helper: Subtracts units of a unitsToSubtract object from the given village
@@ -1173,7 +1173,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (unitObject[unitType] > 0) {
                     // If the value is greater than 0, append to the link
                     completeLink += `&${unitType}=${unitObject[unitType]}`;
-                } else if (unitObject[unitType] === -1) {
+                } else if (unitObject[unitType] === -1 && villageData[unitType] >= 0) {
                     // If the value is -1, use the value from unchangedTroopData if available
                     if (unitsToKeep[unitType] >= 0) {
                         unitAmount = villageData[unitType] - unitsToKeep[unitType];

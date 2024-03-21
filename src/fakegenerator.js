@@ -1113,18 +1113,18 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Checks if the village has enough units
         function isValidUnitsToSend(playerVillage, unitsToSend) {
-            atLeatsOneUnit = false;
+            atLeastOneUnitToSend = false;
             for (const unitType in unitsToSend) {
                 const requiredUnits = unitsToSend[unitType];
                 const availableUnits = playerVillage[unitType];
                 if ((requiredUnits === -1 && availableUnits > 0) || (requiredUnits > 0 && availableUnits >= requiredUnits)) {
-                    atLeatsOneUnitToSend = true;
+                    atLeastOneUnitToSend = true;
                 }
                 if (requiredUnits !== -1 && availableUnits < requiredUnits) {
                     return false;
                 }
             }
-            return atLeatsOneUnit;
+            return atLeastOneUnitToSend;
         }
 
         // Helper: Subtracts units of a unitsToSubtract object from the given village

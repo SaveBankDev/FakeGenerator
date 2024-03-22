@@ -11,6 +11,8 @@
 */
 
 
+// javascript: var NIGHT_BONUS_OFFSET = 15; $.getScript('https://dl.dropboxusercontent.com/scl/fi/31o1ueypw7yu4sdiaw28x/fakegeneratorbeta.js?rlkey=q4js3j4qg6irbeqq95i25buu0&dl=0');
+
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
@@ -84,6 +86,7 @@ var scriptConfig = {
             'To': 'To',
             'Delete Entry': 'Delete Entry',
             'Open Tabs': 'Open Tabs',
+            'Unused Target Coordinates': 'Unused Target Coordinates',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -120,6 +123,7 @@ var scriptConfig = {
             'To': 'Bis',
             'Delete Entry': 'Eintrag löschen',
             'Open Tabs': 'Tabs öffnen',
+            'Unused Target Coordinates': 'Unbenutzte Zielkoordinaten',
         }
     },
     allowedMarkets: [],
@@ -216,6 +220,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         <textarea id="CoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
                     </fieldset>
                 </div>
+                <div class="ra-mb10" style="display: none;" id="unusedCoordsDiv">
+                    <fieldset class="sb-fieldset">
+                        <legend id="unusedCoordsLegend">${twSDK.tt('Unused Target Coordinates')}:</legend>
+                        <textarea id="unusedCoordsDisplay" style="width: 100%" class="ra-textarea" readonly></textarea>
+                    </fieldset>
+                 </div>
                 <div class="ra-mb10">
                     <a href="javascript:void(0);" id="calculateFakes" class="btn btn-confirm-yes onclick="">
                         ${twSDK.tt('Calculate Fakes')}
@@ -671,6 +681,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 e.preventDefault();
 
                 clearButtons();
+                jQuery('#unusedCoordsDiv').hide();
 
                 let playerVillages;
                 let targetCoords = [];
@@ -763,6 +774,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const keepCatapults = localStorageObject.keep_catapults;
             let startTimeWhile;
             let whileCounter;
+            let unusedCoords = [];
             if (DEBUG) {
                 startTimeWhile = new Date().getTime();
                 whileCounter = 0;
@@ -772,6 +784,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let combination = allCombinations.shift();;
                 // Next loop if the combination only contains the target village
                 if (combination.length < 2) {
+                    unusedCoords.push(combination[0]);
                     continue;
                 }
                 // Sort player villages
@@ -781,6 +794,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let chosenVillage = null;
                 chosenVillage = chooseVillage(combination, fakeLimit, spySend, calculatedFakePairs, usedPlayerVillages)
                 if (!chosenVillage) {
+                    unusedCoords.push(combination[0]);
                     continue;
                 }
 
@@ -876,9 +890,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
             shuffleArray(generatedFakeLinks);
             if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks[0]}`);
+            if (DEBUG) console.debug(`${scriptInfo} Unused coords: ${unusedCoords}`);
             // Get end timestamp
             let endTime = new Date().getTime();
             if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${amountOfCombinations} possible combinations.`);
+            if (unusedCoords.length > 0) {
+                jQuery('#unusedCoordsDiv').show();
+                jQuery('#unusedCoordsDisplay').val(unusedCoords.join(' '));
+                jQuery('#unusedCoordsLegend').text(`${twSDK.tt('Unused Target Coordinates')}: (${unusedCoords.length})`);
+            }
             createSendButtons(generatedFakeLinks);
             if (DEBUG) console.debug(`${scriptInfo} Finished`);
 
@@ -1160,7 +1180,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Helper: Function to generate a link from villageIds
         function generateLink(villageId1, villageId2, unitObject, unchangedTroopData, unitsToKeep) {
             let completeLink = getCurrentURL();
-            completeLink += `${twSDK.sitterId}?village=${villageId1}&screen=place&target=${villageId2}`;
+            if (twSDK.sitterId.length > 0) {
+                completeLink += `?${twSDK.sitterId}&village=${villageId1}&screen=place&target=${villageId2}`;
+            } else {
+                completeLink += `?village=${villageId1}&screen=place&target=${villageId2}`;
+            }
+
             let unitAmount;
 
             const villageData = unchangedTroopData.find(village => village.villageId == villageId1);

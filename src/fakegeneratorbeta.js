@@ -83,13 +83,14 @@ var scriptConfig = {
             'From': 'From',
             'To': 'To',
             'Delete Entry': 'Delete Entry',
+            'Open Tabs': 'Open Tabs',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
             Help: 'Hilfe',
             'Fake Generator': 'Fake Generator',
             'Group': 'Gruppe',
-            'Attacks per Button': 'Angriffe pro Buttton',
+            'Attacks per Button': 'Angriffe pro Button',
             'There was an error!': 'Es gab einen Fehler!',
             'Calculate Fakes': 'Berechne Fakes',
             'Insert target coordinates here': 'Zielkoordinaten hier einfuegen',
@@ -118,6 +119,7 @@ var scriptConfig = {
             'From': 'Von',
             'To': 'Bis',
             'Delete Entry': 'Eintrag löschen',
+            'Open Tabs': 'Tabs öffnen',
         }
     },
     allowedMarkets: [],
@@ -149,8 +151,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         const groups = await fetchVillageGroups();
         const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
         const villageData = villageArrayToDict(villages);
-        // REMOVE IN LIVE
-        let usedVillageIds = new Set();
 
         // Entry point
         (async function () {
@@ -224,7 +224,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             </div>
             <div>
                 <div id="open_tabs" style="display: none;" class="ra-mb10">
-                    <h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>
+                    <h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>
                 </div>
             </div>`;
             const style = `
@@ -324,21 +324,19 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
                 .entries-table {
                     width: 100%;
-                    border-collapse: separate; /* Change to separate to enable border-spacing */
-                    border-spacing: 10px 0; /* Add horizontal spacing */
+                    border-collapse: collapse;
                 }
                 .entries-table th {
                     background-color: #f2f2f2;
                     text-align: left;
                     padding: 10px;
-                    border: 1px solid #ddd; /* Add a border to create a gap effect */
                 }
                 .entries-table td {
                     border: 1px solid #ddd;
                     padding: 8px;
                 }
                 .entry-row:nth-child(even) {
-                    background-color: #f0e2be;
+                    background-color: ##f0e2be;
                 }
                 .entry-row:nth-child(odd) {
                     background-color: #fff5da;
@@ -720,21 +718,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 } else {
                     spySend = false;
                 }
-
-
-                // REMOVE IN LIVE
-                let array = [];
-                if (DEBUG) {
-                    // Moved outside to only be generated once, records all used villageIds
-                    for (i = 0; i < 99; i++) {
-                        array.push(generateRandomVillageObject());
-                    }
-                    unchangedTroopData = JSON.parse(JSON.stringify(array));
-                    calculateAttacks(array, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), worldUnitInfo.config, spySend, unchangedTroopData);
-
-                } else {
-                    calculateAttacks(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), worldUnitInfo.config, spySend, unchangedTroopData);
-                }
+                calculateAttacks(playerVillages, targetCoords, worldConfig.config.night, parseInt(worldConfig.config.game.fake_limit), worldUnitInfo.config, spySend, unchangedTroopData);
             });
         }
 
@@ -805,7 +789,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     subtractUnitsFromVillage(chosenVillage, unitsToSend);
                 } else if (unitSelectionType == "dynamically") {
                     let unitObjectCatapult = createDefaultUnitsObject();
-                    unitObjectCatapult["catapult"] = keepCatapults;
+                    unitObjectCatapult["catapult"] = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
                     if (spySend) {
                         unitObjectCatapult["spy"] = 1;
                     }
@@ -1129,15 +1113,18 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Checks if the village has enough units
         function isValidUnitsToSend(playerVillage, unitsToSend) {
+            atLeastOneUnitToSend = false;
             for (const unitType in unitsToSend) {
                 const requiredUnits = unitsToSend[unitType];
-                const availableUnits = playerVillage[unitType] >= 0 ? playerVillage[unitType] : 0;
-
+                const availableUnits = playerVillage[unitType];
+                if ((requiredUnits === -1 && availableUnits > 0) || (requiredUnits > 0 && availableUnits >= requiredUnits)) {
+                    atLeastOneUnitToSend = true;
+                }
                 if (requiredUnits !== -1 && availableUnits < requiredUnits) {
                     return false;
                 }
             }
-            return true;
+            return atLeastOneUnitToSend;
         }
 
         // Helper: Subtracts units of a unitsToSubtract object from the given village
@@ -1173,7 +1160,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Helper: Function to generate a link from villageIds
         function generateLink(villageId1, villageId2, unitObject, unchangedTroopData, unitsToKeep) {
             let completeLink = getCurrentURL();
-            completeLink += `?village=${villageId1}&screen=place&target=${villageId2}`;
+            completeLink += `${twSDK.sitterId}?village=${villageId1}&screen=place&target=${villageId2}`;
             let unitAmount;
 
             const villageData = unchangedTroopData.find(village => village.villageId == villageId1);
@@ -1186,7 +1173,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 if (unitObject[unitType] > 0) {
                     // If the value is greater than 0, append to the link
                     completeLink += `&${unitType}=${unitObject[unitType]}`;
-                } else if (unitObject[unitType] === -1) {
+                } else if (unitObject[unitType] === -1 && villageData[unitType] >= 0) {
                     // If the value is -1, use the value from unchangedTroopData if available
                     if (unitsToKeep[unitType] >= 0) {
                         unitAmount = villageData[unitType] - unitsToKeep[unitType];
@@ -1283,47 +1270,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 return (reqCatapults > 0) ? reqCatapults : 1;
             }
         }
-        // Currently unused since function call overhead apparently ruins performance 
-        // Helper: Checks if the given timestamp is in our arrival times array
-        function isTimestampInArrivalTimes(timestamp) {
-            const localStorageObject = getLocalStorage();
-            const arrivalTimes = localStorageObject.arrival_times;
-            if (arrivalTimes.length === 0) {
-                return true;
-            }
-            for (const [start, end] of arrivalTimes) {
-                if (timestamp >= start && timestamp <= end) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        // Currently unused since function call overhead apparently ruins performance 
-        // Helper: Checks if the arrival time is in the night bonus or not
-        function checkArrivalTimeOutsideNightBonus(start_hour, end_hour, timestamp) {
-            const time = new Date(timestamp);
-            const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
-
-            // We want to arrive shortly before the night bonus to give the player time to send the attacks
-            const checkStartNb = ((start_hour + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
-            const checkEndNb = end_hour;
-
-            // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
-            if (start_hour === end_hour) {
-                return false; // edge case where start and end time are the same
-            } else {
-                return (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
-            }
-        }
 
         function clearButtons() {
             // Fetch the 'open_tabs' div where buttons will be appended
             let openTabsDiv = document.getElementById("open_tabs");
 
             // Reset the buttons
-            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>Open Tabs</u></center></h2>`;
+            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>`;
             // Make the 'open_tabs' div visible
             openTabsDiv.style.display = "none";
         }
@@ -1500,7 +1453,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
             const units = game_data.units;
             let contentManualUnitSelection = "";
-            const unitsToIgnore = ['militia', 'knight', 'snob'];
+            const unitsToIgnore = ['militia', 'snob'];
             let unitTableSend = buildUnitsPicker(unitsToIgnore, "send", 'number');
             let unitTableKeep = buildUnitsPicker(unitsToIgnore, "keep", 'number');
 
@@ -1839,48 +1792,5 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             return unitsTable;
         }
-        // REMOVE IN LIVE
-        // Helper function to generate random integer between min (inclusive) and max (exclusive)
-        function getRandomInt(min, max) {
-            min = Math.ceil(min);
-            max = Math.floor(max);
-            return Math.floor(Math.random() * (max - min) + min); //The maximum is exclusive and the minimum is inclusive
-        }
-
-        // REMOVE IN LIVE VERSION
-        function generateRandomVillageObject() {
-            // Generate a random coordinate string 'xxx|yyy'
-            const coord = `${getRandomInt(400, 450).toString().padStart(3, '0')}|${getRandomInt(450, 500).toString().padStart(3, '0')}`;
-
-            let villageId;
-
-            // Ensure villageId is unique by generating new ones until we find one that hasn't been used
-            do {
-                villageId = getRandomInt(1, 2001);
-            } while (usedVillageIds.has(villageId));
-
-            // Record the used villageId
-            usedVillageIds.add(villageId);
-
-            return {
-                archer: getRandomInt(0, 9999),
-                axe: getRandomInt(0, 9999),
-                catapult: getRandomInt(150, 160),
-                coord: coord,
-                heavy: getRandomInt(0, 9999),
-                knight: getRandomInt(0, 9999),
-                light: getRandomInt(0, 9999),
-                marcher: getRandomInt(0, 9999),
-                militia: getRandomInt(0, 1),
-                ram: getRandomInt(0, 9999),
-                points: getRandomInt(8000, 9000),
-                snob: getRandomInt(0, 1),
-                spear: getRandomInt(0, 9999),
-                spy: getRandomInt(0, 9999),
-                sword: getRandomInt(0, 9999),
-                villageId: villageId
-            };
-        }
-
     }
 );

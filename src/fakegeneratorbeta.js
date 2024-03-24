@@ -78,7 +78,7 @@ var scriptConfig = {
             'Keep Catapults': 'Keep Catapults',
             'Enter units to send (-1 for all troops)': 'Enter units to send (-1 for all troops)',
             'Enter units to keep (-1 for all troops)': 'Enter units to keep (-1 for all troops)',
-            'Coordinates': 'Coordinates',
+            'Target Coordinates': 'Target Coordinates',
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
             'Reset Input': 'Reset Input',
@@ -123,7 +123,7 @@ var scriptConfig = {
             'Keep Catapults': 'Katapulte zurückhalten',
             'Enter units to send (-1 for all troops)': 'Zu sendende Truppen eingeben (-1 für alle Truppen)',
             'Enter units to keep (-1 for all troops)': 'Zu behaltende Truppen eingeben (-1 für alle Truppen)',
-            'Coordinates': 'Koordinaten',
+            'Target Coordinates': 'Zielkoordinaten',
             'Delete all arrival times': 'Alle Ankunftszeiten löschen',
             'Arrival time': 'Ankunftszeiten',
             'Reset Input': 'Eingaben zurücksetzen',
@@ -265,21 +265,21 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 </div>
                 <div class="ra-mb10">
                     <fieldset class="sb-fieldset">
-                        <legend id="coordinates">${twSDK.tt('Coordinates')}:</legend>
+                        <legend id="coordinates">${twSDK.tt('Target Coordinates')}:</legend>
                         <textarea id="CoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
                     </fieldset>
                 </div>
-                <div class="ra-mb10" style="display: none;" id="unusedCoordsDiv">
-                    <fieldset class="sb-fieldset">
-                        <legend id="unusedCoordsLegend">${twSDK.tt('Unused Target Coordinates')}:</legend>
-                        <textarea id="unusedCoordsDisplay" style="width: 100%" class="ra-textarea" readonly></textarea>
-                    </fieldset>
-                 </div>
                 <div class="ra-mb10">
                     <a href="javascript:void(0);" id="calculateFakes" class="btn btn-confirm-yes onclick="">
                         ${twSDK.tt('Calculate Fakes')}
                     </a>
                 </div>
+            </div>
+            <div class="ra-mb10" style="display: none;" id="unusedCoordsDiv">
+                <fieldset class="sb-fieldset">
+                    <legend id="unusedCoordsLegend">${twSDK.tt('Unused Target Coordinates')}:</legend>
+                    <textarea id="unusedCoordsDisplay" style="width: 100%" class="ra-textarea" readonly></textarea>
+                </fieldset>
             </div>
             <div>
                 <div id="open_tabs" style="display: none;" class="ra-mb10">
@@ -430,8 +430,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     background: #c92722;
                     background: linear-gradient(to bottom, #c92722 0%,#a00d08 100%);
                 }
-
+                #calculateTotalPossibleAttacks {
+                    width: 100%;
+                }
             `;
+
 
             twSDK.renderBoxWidget(
                 content,
@@ -496,7 +499,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
                 // Use setLocalStorage to update buffer_nightbonus value
                 let localStorageSettingsBufferNightbonus = getLocalStorage();
-                localStorageSettingsBufferNightbonus.buffer_nightbonus = e.target.value;
+                localStorageSettingsBufferNightbonus.buffer_nightbonus = (parseInt(e.target.value) >= 0) ? e.target.value : NIGHT_BONUS_OFFSET;
+                e.target.value = localStorageSettingsBufferNightbonus.buffer_nightbonus;
                 saveLocalStorage(localStorageSettingsBufferNightbonus);
             });
 
@@ -680,7 +684,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             let target_coords = getLocalStorage().target_coordinates;
             if (target_coords && target_coords.length > 0) {
-                jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}: ${target_coords.length}`);
+                jQuery('#coordinates').text(`${twSDK.tt('Target Coordinates')}: ${target_coords.length}`);
             }
             jQuery('#CoordInput').val(target_coords.join(' '));
             // For the coord input text area
@@ -693,10 +697,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     amountOfCoords = coordinates.length;
                     existingCoordinates = coordinates.filter(coord => checkIfVillageExists(coord));
                     this.value = existingCoordinates.join(' ');
-                    jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}: ${existingCoordinates.length}`);
+                    jQuery('#coordinates').text(`${twSDK.tt('Target Coordinates')}: ${existingCoordinates.length}`);
                 } else {
                     this.value = '';
-                    jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}:`);
+                    jQuery('#coordinates').text(`${twSDK.tt('Target Coordinates')}:`);
                 }
                 let endTime = new Date().getTime();
                 if (DEBUG) {
@@ -900,7 +904,16 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
             while (allCombinations.length > 0) {
                 if (DEBUG) whileCounter += 1;
-                let combination = allCombinations.shift();;
+                let combination = allCombinations.shift();
+
+                // Filter villages below ratio if ratio is active
+                if (ratio > 0) {
+                    if ((game_data.player.points / ratio) < parseInt(villageData[combination[0]][2])) {
+                        unusedCoords.push(combination[0]);
+                        continue;
+                    }
+                }
+
                 // Next loop if the combination only contains the target village
                 if (combination.length < 2) {
                     unusedCoords.push(combination[0]);
@@ -1016,7 +1029,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             if (unusedCoords.length > 0) {
                 jQuery('#unusedCoordsDiv').show();
                 jQuery('#unusedCoordsDisplay').val(unusedCoords.join(' '));
-                jQuery('#unusedCoordsLegend').text(`${twSDK.tt('Unused Target Coordinates')}: (${unusedCoords.length})`);
+                jQuery('#unusedCoordsLegend').text(`${twSDK.tt('Unused Target Coordinates')}: ${unusedCoords.length}`);
             }
             createSendButtons(generatedFakeLinks);
             if (DEBUG) console.debug(`${scriptInfo} Finished`);

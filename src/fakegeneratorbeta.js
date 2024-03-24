@@ -894,7 +894,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitSelectionType = localStorageObject.unit_selection_type;
             const unitsToSend = localStorageObject.units_to_send;
             const unitsToKeep = localStorageObject.units_to_keep;
-            const keepCatapults = localStorageObject.keep_catapults;
             let startTimeWhile;
             let whileCounter;
             let unusedCoords = [];
@@ -967,6 +966,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         allCombinations.sort((a, b) => a.length - b.length);
                     }
                 } else if (unitSelectionType == "dynamically") {
+                    minCat = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
                     if (chosenVillage.catapult < minCat || (spySend && chosenVillage.spy <= 0)) {
                         allCombinations = allCombinations.map(combination => {
                             return combination.filter(element => element !== chosenVillage);
@@ -1057,6 +1057,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitsToSend = localStorageObject.units_to_send;
             const keepCatapults = localStorageObject.keep_catapults;
             const arrivalTimes = localStorageObject.arrival_times;
+            const nightBonusOffset = parseInt(localStorageObject.buffer_nightbonus);
+            const avoidNightBonus = parseBool(localStorageObject.avoid_nightbonus);
             let playerVillagesWithEnoughUnits = [];
             if (unitSelectionType === "manually") {
                 // Subtract units_to_keep from player villages 
@@ -1084,20 +1086,22 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             }
                         }
                         if (!timeBool) continue;
-                        const time = new Date(currentTime + travelTime);
-                        const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
-
                         // We want to arrive shortly before the night bonus to give the player time to send the attacks
-                        const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
-                        const checkEndNb = parseInt(nightInfo.end_hour);
+                        if (avoidNightBonus) {
+                            const time = new Date(currentTime + travelTime);
+                            const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
-                        // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
-                        if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
-                            nightBool = false; // edge case where start and end time are the same
-                        } else {
-                            nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (nightBonusOffset / 60)) % 24;  // Wrap around when subtracting offsett
+                            const checkEndNb = parseInt(nightInfo.end_hour);
+
+                            // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
+                            if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
+                                nightBool = false; // edge case where start and end time are the same
+                            } else {
+                                nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            }
+                            if (!nightBool) continue;
                         }
-                        if (!nightBool) continue;
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -1138,20 +1142,20 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             }
                         }
                         if (!timeBool) continue;
-                        const time = new Date(currentTime + travelTime);
-                        const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
+                        if (avoidNightBonus) {
+                            const time = new Date(currentTime + travelTime);
+                            const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
-                        // We want to arrive shortly before the night bonus to give the player time to send the attacks
-                        const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
-                        const checkEndNb = parseInt(nightInfo.end_hour);
+                            const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (nightBonusOffset / 60)) % 24;  // Wrap around when subtracting offsett
+                            const checkEndNb = parseInt(nightInfo.end_hour);
 
-                        // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
-                        if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
-                            nightBool = false; // edge case where start and end time are the same
-                        } else {
-                            nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
+                                nightBool = false; // edge case where start and end time are the same
+                            } else {
+                                nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            }
+                            if (!nightBool) continue;
                         }
-                        if (!nightBool) continue;
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -1322,6 +1326,18 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
             }
             jQuery('#calculateTotalPossibleAttacks').text(`${totalPossibleAttacks}`);
+        }
+
+        // Helper: Parses boolean
+        function parseBool(input) {
+            if (typeof input === 'string') {
+                return input.toLowerCase() === 'true';
+            } else if (typeof input === 'boolean') {
+                return input;
+            } else {
+                console.error(`${scriptInfo}: Invalid input: needs to be a string or boolean.`);
+                return false;
+            }
         }
 
         // Helper: Checks if the village has enough units
@@ -1887,17 +1903,18 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         }
 
         function resetInput() {
+            localStorageObject = getLocalStorage();
             const defaultSettings = {
                 chosen_group: 0,
                 attack_per_button: DEFAULT_ATTACKS_PER_BUTTON,
                 delay: DEFAULT_DELAY,
-                unit_selection_type: 'dynamically',
+                unit_selection_type: localStorageObject.unit_selection_type,
                 max_attacks_per_village: DEFAULT_MAX_ATTACKS_PER_VILLAGE,
                 send_spy: 'yes',
                 keep_catapults: 0,
                 units_to_send: {},
                 units_to_keep: {},
-                arrival_times: [],
+                arrival_times: localStorageObject.arrival_times,
                 target_coordinates: []
             };
 

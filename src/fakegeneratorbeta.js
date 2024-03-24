@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.1
-* Last Updated: 2024-02-19
+* Version: v2.2
+* Last Updated: 2024-03-24
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -10,8 +10,6 @@
 * Mod: RedAlert
 */
 
-
-// javascript: var NIGHT_BONUS_OFFSET = 15; $.getScript('https://dl.dropboxusercontent.com/scl/fi/31o1ueypw7yu4sdiaw28x/fakegeneratorbeta.js?rlkey=q4js3j4qg6irbeqq95i25buu0&dl=0');
 
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
@@ -48,7 +46,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.1',
+        version: 'v2.2',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -235,6 +233,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     </div>
                 </div>
                 <div class="ra-mb10">
+                    ${dynamicUnitSelection}
+                </div>
+                <div class="ra-mb10">
+                    ${manualUnitSelection}
+                </div>
+                <div class="ra-mb10">
                     <div class="sb-grid sb-grid-4">
                         <fieldset class="sb-fieldset">
                             <legend>${twSDK.tt('Total number of possible Attacks')}:</legend>
@@ -253,12 +257,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             <input type="number" id="bufferNightbonus" />
                         </fieldset>
                     </div>
-                </div>
-                <div>
-                    ${dynamicUnitSelection}
-                </div>
-                <div>
-                    ${manualUnitSelection}
                 </div>
                 <div class="ra-mb10">
                     ${arrivalTimeSelector}
@@ -1296,6 +1294,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let units_to_keep = localStorageObject.units_to_keep;
             let keep_catapults = localStorageObject.keep_catapults;
             let unitSelectionType = localStorageObject.unit_selection_type;
+            let max_attacks_per_village = parseInt(localStorageObject.max_attacks_per_village);
 
             let keepCatapultsObject = createDefaultUnitsObject();
             keepCatapultsObject["catapult"] = keep_catapults;
@@ -1312,6 +1311,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             for (let playerVillage of playerVillages) {
+                let = numberOfAttacksOfThisVillage = 0;
                 if (unitSelectionType === "dynamically") {
                     unitsToSend["catapult"] = getMinAmountOfCatapults(playerVillage.points, parseInt(worldConfig.config.game.fake_limit));
                     subtractUnitsFromVillage(playerVillage, keepCatapultsObject);
@@ -1322,6 +1322,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
                 while (isValidUnitsToSend(playerVillage, unitsToSend)) {
                     totalPossibleAttacks += 1;
+                    numberOfAttacksOfThisVillage += 1;
+                    if (max_attacks_per_village > 0 && numberOfAttacksOfThisVillage >= max_attacks_per_village) {
+                        break;
+                    }
                     subtractUnitsFromVillage(playerVillage, unitsToSend);
                 }
             }
@@ -1915,7 +1919,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 units_to_send: {},
                 units_to_keep: {},
                 arrival_times: localStorageObject.arrival_times,
-                target_coordinates: []
+                target_coordinates: [],
+                filter_ratio: false,
+                avoid_nightbonus: true,
+                buffer_nightbonus: NIGHT_BONUS_OFFSET,
             };
 
             // Initialize units_to_send and units_to_keep with each unit set to 0

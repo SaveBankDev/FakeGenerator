@@ -1306,7 +1306,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
 
             for (let playerVillage of playerVillages) {
-                let = numberOfAttacksOfThisVillage = 0;
+                let numberOfAttacksOfThisVillage = 0;
                 if (unitSelectionType === "dynamically") {
                     unitsToSend["catapult"] = getMinAmountOfCatapults(playerVillage.points, parseInt(worldConfig.config.game.fake_limit));
                     subtractUnitsFromVillage(playerVillage, keepCatapultsObject);
@@ -1341,7 +1341,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Checks if the village has enough units
         function isValidUnitsToSend(playerVillage, unitsToSend) {
-            atLeastOneUnitToSend = false;
+            let atLeastOneUnitToSend = false;
             for (const unitType in unitsToSend) {
                 const requiredUnits = unitsToSend[unitType];
                 const availableUnits = playerVillage[unitType];
@@ -1517,7 +1517,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             // Reset the buttons
             openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>`;
-            // Make the 'open_tabs' div visible
+            // Make the 'open_tabs' div invisible
             openTabsDiv.style.display = "none";
         }
 

@@ -872,12 +872,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 return;
             }
 
-            //Filter arrays less than 1 in length, meaning only containing the target village and sorth them based on amount of player villages found
-            if (DEBUG) console.debug(`${scriptInfo} Unfiltered length of allCombinations: ${allCombinations.length}`);
-            allCombinations = allCombinations.filter((combination) => combination.length > 1);
             allCombinations.sort((a, b) => a.length - b.length);
-            let startingAmountOfComb = allCombinations.length;
-            if (DEBUG) console.debug(`${scriptInfo} Filtered length of allCombinations: ${startingAmountOfComb}`);
 
             //Initializing map to count the usage of each playerVillage
             let usedPlayerVillages = new Map();

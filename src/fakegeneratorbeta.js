@@ -1768,80 +1768,106 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         }
         // Helper: Fetch home troop counts for current group
         async function fetchTroopsForCurrentGroup(groupId) {
-            const mobileCheck = $('#mobileHeader').length > 0;
-            const troopsForGroup = await jQuery.get(game_data.link_base_pure + `overview_villages&mode=combined&group=${groupId}&page=-1`).then(async (response) => {
-                const htmlDoc = jQuery.parseHTML(response);
-                const homeTroops = [];
+            const mobileCheck = jQuery('#mobileHeader').length > 0;
+            const troopsForGroup = await jQuery
+                .get(
+                    game_data.link_base_pure +
+                    `overview_villages&mode=combined&group=${groupId}&page=-1`
+                )
+                .then(async (response) => {
+                    const htmlDoc = jQuery.parseHTML(response);
+                    const homeTroops = [];
 
-                if (mobileCheck) {
-                    let table = jQuery(htmlDoc).find('#combined_table tr.nowrap');
-                    for (let i = 0; i < table.length; i++) {
-                        let objTroops = {};
-                        let coord = table[i].getElementsByClassName('quickedit-label')[0].innerHTML;
-                        let villageId = parseInt(table[i].getElementsByClassName('quickedit-vn')[0].getAttribute('data-id'));
-                        let listTroops = Array.from(table[i].getElementsByTagName('img')).filter((e) => e.src.includes('unit')).map((e) => ({
-                            name: e.src.split('unit_')[1].replace('@2x.png', ''),
-                            value: parseInt(e.parentElement.nextElementSibling.innerText),
-                        }));
-                        listTroops.forEach((item) => {
-                            objTroops[item.name] = item.value;
+                    if (mobileCheck) {
+                        let table = jQuery(htmlDoc).find('#combined_table tr.nowrap');
+                        for (let i = 0; i < table.length; i++) {
+                            let objTroops = {};
+                            let villageId = parseInt(
+                                table[i]
+                                    .getElementsByClassName('quickedit-vn')[0]
+                                    .getAttribute('data-id')
+                            );
+                            let listTroops = Array.from(
+                                table[i].getElementsByTagName('img')
+                            )
+                                .filter((e) => e.src.includes('unit'))
+                                .map((e) => ({
+                                    name: e.src
+                                        .split('unit_')[1]
+                                        .replace('@2x.png', ''),
+                                    value: parseInt(
+                                        e.parentElement.nextElementSibling.innerText
+                                    ),
+                                }));
+                            listTroops.forEach((item) => {
+                                objTroops[item.name] = item.value;
+                            });
+
+                            objTroops.villageId = villageId;
+
+                            homeTroops.push(objTroops);
                         }
+                    } else {
+                        const combinedTableRows = jQuery(htmlDoc).find(
+                            '#combined_table tr.nowrap'
                         );
-                        objTroops.coord = getLastMatch(coord);
-                        objTroops.villageId = villageId;
+                        const combinedTableHead = jQuery(htmlDoc).find(
+                            '#combined_table tr:eq(0) th'
+                        );
 
-                        homeTroops.push(objTroops);
-                    }
-                } else {
-                    const combinedTableRows = jQuery(htmlDoc).find('#combined_table tr.nowrap');
-                    const combinedTableHead = jQuery(htmlDoc).find('#combined_table tr:eq(0) th');
+                        const combinedTableHeader = [];
 
-                    const combinedTableHeader = [];
-
-                    // Collect possible buildings and troop types
-                    jQuery(combinedTableHead).each(function () {
-                        const thImage = jQuery(this).find('img').attr('src');
-                        if (thImage) {
-                            let thImageFilename = thImage.split('/').pop();
-                            thImageFilename = thImageFilename.replace('.png', '');
-                            combinedTableHeader.push(thImageFilename);
-                        } else {
-                            combinedTableHeader.push(null);
-                        }
-                    });
-
-                    // Collect possible troop types
-                    combinedTableRows.each(function () {
-                        let rowTroops = {};
-
-                        combinedTableHeader.forEach((tableHeader, index) => {
-                            if (tableHeader) {
-                                if (tableHeader.includes('unit_')) {
-                                    const coord = twSDK.getCoordFromString(jQuery(this).find('td:eq(1) span.quickedit-label').text());
-                                    const villageId = jQuery(this).find('td:eq(1) span.quickedit-vn').attr('data-id');
-                                    const unitType = tableHeader.replace('unit_', '');
-                                    rowTroops = {
-                                        ...rowTroops,
-                                        villageId: parseInt(villageId),
-                                        coord: coord,
-                                        [unitType]: parseInt(jQuery(this).find(`td:eq(${index})`).text()),
-                                    };
-                                }
+                        // collect possible buildings and troop types
+                        jQuery(combinedTableHead).each(function () {
+                            const thImage = jQuery(this).find('img').attr('src');
+                            if (thImage) {
+                                let thImageFilename = thImage.split('/').pop();
+                                thImageFilename = thImageFilename.replace('.png', '');
+                                combinedTableHeader.push(thImageFilename);
+                            } else {
+                                combinedTableHeader.push(null);
                             }
-                        }
-                        );
+                        });
 
-                        homeTroops.push(rowTroops);
-                    });
-                }
+                        // collect possible troop types
+                        combinedTableRows.each(function () {
+                            let rowTroops = {};
 
-                return homeTroops;
-            }
-            ).catch((error) => {
-                UI.ErrorMessage(tt('An error occured while fetching troop counts!'));
-                console.error(`${scriptInfo} Error:`, error);
-            }
-            );
+                            combinedTableHeader.forEach((tableHeader, index) => {
+                                if (tableHeader) {
+                                    if (tableHeader.includes('unit_')) {
+                                        const villageId = jQuery(this)
+                                            .find('td:eq(1) span.quickedit-vn')
+                                            .attr('data-id');
+                                        const unitType = tableHeader.replace(
+                                            'unit_',
+                                            ''
+                                        );
+                                        rowTroops = {
+                                            ...rowTroops,
+                                            villageId: parseInt(villageId),
+                                            [unitType]: parseInt(
+                                                jQuery(this)
+                                                    .find(`td:eq(${index})`)
+                                                    .text()
+                                            ),
+                                        };
+                                    }
+                                }
+                            });
+
+                            homeTroops.push(rowTroops);
+                        });
+                    }
+
+                    return homeTroops;
+                })
+                .catch((error) => {
+                    UI.ErrorMessage(
+                        tt('An error occured while fetching troop counts!')
+                    );
+                    console.error(`${scriptInfo()} Error:`, error);
+                });
 
             return troopsForGroup;
         }

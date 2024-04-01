@@ -96,6 +96,7 @@ var scriptConfig = {
             'Total number of possible Attacks': 'Total number of possible Attacks',
             'Calculate!': 'Calculate!',
             'Too many requests! Please wait a moment before trying again.': 'Too many requests! Please wait a moment before trying again.',
+            'One or more of the fetched world configuration data is empty.': 'One or more of the fetched world configuration data is empty.',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -141,6 +142,7 @@ var scriptConfig = {
             'Total number of possible Attacks': 'Mögliche Angriffsanzahl',
             'Calculate!': 'Berechnen!',
             'Too many requests! Please wait a moment before trying again.': 'Zu viele Anfragen! Bitte warten Sie einen Moment, bevor Sie es erneut versuchen.',
+            'One or more of the fetched world configuration data is empty.': 'Eine oder mehrere der abgerufenen Weltkonfigurationsdaten sind leer.',
         }
     },
     allowedMarkets: [],
@@ -172,6 +174,16 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         UI.InfoMessage(twSDK.tt('Loading...'));
         const groups = await fetchVillageGroups();
         const { players, villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
+        console.log('players', players);
+        console.log('villages', villages);
+        console.log('worldUnitInfo', worldUnitInfo);
+        console.log('worldConfig', worldConfig);
+        if (players.length < 1 || villages.length < 1 || !worldUnitInfo || !worldConfig) {
+            UI.ErrorMessage('One or more of the fetched world data is empty.', 5000);
+            return;
+        }
+
+
         const allPlayers = new Map(players.map(player => [player[0], player.slice(1)]));
         const villageData = villageArrayToDict(villages);
 
@@ -1864,9 +1876,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 })
                 .catch((error) => {
                     UI.ErrorMessage(
-                        tt('An error occured while fetching troop counts!')
+                        twSDK.tt('There was an error while fetching the data!')
                     );
-                    console.error(`${scriptInfo()} Error:`, error);
+                    console.error(`${scriptInfo} Error:`, error);
                 });
 
             return troopsForGroup;

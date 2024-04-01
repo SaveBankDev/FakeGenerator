@@ -1915,18 +1915,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             document.getElementById('arrivalTimeFieldset').appendChild(entriesTable);
         }
 
-        function getLastMatch(inputString) {
-            const regex = COORD_REGEX;
-            let lastMatch = null;
-            let match;
-
-            while ((match = regex.exec(inputString)) !== null) {
-                lastMatch = match[0];
-            }
-
-            return lastMatch;
-        }
-
         function resetInput() {
             localStorageObject = getLocalStorage();
             const defaultSettings = {

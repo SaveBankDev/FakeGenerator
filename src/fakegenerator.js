@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.1
-* Last Updated: 2024-02-19
+* Version: v2.2
+* Last Updated: 2024-04-02
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -10,13 +10,15 @@
 * Mod: RedAlert
 */
 
-
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
 if (typeof NIGHT_BONUS_OFFSET !== 'number') NIGHT_BONUS_OFFSET = 15; // 15 minutes before Night bonus to give players time to send the attacks
 
+
 // Global variable
+var STANDARD_DELAY = 200;
+var LAST_REQUEST_TIME = 0;
 var DEFAULT_ATTACKS_PER_BUTTON = 20;
 var DEFAULT_DELAY = 250;
 var DEFAULT_MAX_ATTACKS_PER_VILLAGE = 0;
@@ -43,7 +45,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.1',
+        version: 'v2.2',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -73,7 +75,7 @@ var scriptConfig = {
             'Keep Catapults': 'Keep Catapults',
             'Enter units to send (-1 for all troops)': 'Enter units to send (-1 for all troops)',
             'Enter units to keep (-1 for all troops)': 'Enter units to keep (-1 for all troops)',
-            'Coordinates': 'Coordinates',
+            'Target Coordinates': 'Target Coordinates',
             'Delete all arrival times': 'Delete all arrival times',
             'Arrival time': 'Arrival time',
             'Reset Input': 'Reset Input',
@@ -84,6 +86,16 @@ var scriptConfig = {
             'To': 'To',
             'Delete Entry': 'Delete Entry',
             'Open Tabs': 'Open Tabs',
+            'Unused Target Coordinates': 'Unused Target Coordinates',
+            'Loading...': 'Loading...',
+            'Ready!': 'Ready!',
+            'Filter': 'Filter',
+            'Avoid attacks into night bonus?': 'Avoid attacks into night bonus?',
+            'Buffer to night bonus (in minutes)': 'Buffer to night bonus (in minutes)',
+            'Total number of possible Attacks': 'Total number of possible Attacks',
+            'Calculate!': 'Calculate!',
+            'Too many requests! Please wait a moment before trying again.': 'Too many requests! Please wait a moment before trying again.',
+            'One or more of the fetched world configuration data is empty.': 'One or more of the fetched world configuration data is empty.',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -109,7 +121,7 @@ var scriptConfig = {
             'Keep Catapults': 'Katapulte zurückhalten',
             'Enter units to send (-1 for all troops)': 'Zu sendende Truppen eingeben (-1 für alle Truppen)',
             'Enter units to keep (-1 for all troops)': 'Zu behaltende Truppen eingeben (-1 für alle Truppen)',
-            'Coordinates': 'Koordinaten',
+            'Target Coordinates': 'Zielkoordinaten',
             'Delete all arrival times': 'Alle Ankunftszeiten löschen',
             'Arrival time': 'Ankunftszeiten',
             'Reset Input': 'Eingaben zurücksetzen',
@@ -120,6 +132,16 @@ var scriptConfig = {
             'To': 'Bis',
             'Delete Entry': 'Eintrag löschen',
             'Open Tabs': 'Tabs öffnen',
+            'Unused Target Coordinates': 'Unbenutzte Zielkoordinaten',
+            'Loading...': 'Lädt...',
+            'Ready!': 'Bereit!',
+            'Filter': 'Filter',
+            'Avoid attacks into night bonus?': 'Angriffe in den Nachtbonus verhindern?',
+            'Buffer to night bonus (in minutes)': 'Puffer zum Nachtbonus (in Minuten)',
+            'Total number of possible Attacks': 'Mögliche Angriffsanzahl',
+            'Calculate!': 'Berechnen!',
+            'Too many requests! Please wait a moment before trying again.': 'Zu viele Anfragen! Bitte warten Sie einen Moment, bevor Sie es erneut versuchen.',
+            'One or more of the fetched world configuration data is empty.': 'Eine oder mehrere der abgerufenen Weltkonfigurationsdaten sind leer.',
         }
     },
     allowedMarkets: [],
@@ -148,15 +170,39 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             twSDK.redirectTo('overview_villages&combined');
             return;
         }
+        UI.InfoMessage(twSDK.tt('Loading...'));
         const groups = await fetchVillageGroups();
-        const { villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
-        const villageData = villageArrayToDict(villages);
+        const { players, villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
+        if (players.length < 1 || villages.length < 1 || !worldUnitInfo || !worldConfig) {
+            UI.ErrorMessage('One or more of the fetched world data is empty.', 5000);
+            return;
+        }
+        const villageMap = createVillageMap(villages);
+        const allPlayers = new Map(players.map(player => [player[0], player.slice(1)]));
+        const villageData = villageArrayToDict(villages)
+
+        const ratio = parseInt(worldConfig.config.newbie.ratio);
+        const nightBonusActive = (worldConfig.config.night.active === '1') ? true : false;
+
+        if (DEBUG) {
+            console.debug(`${scriptInfo} Groups:`, groups);
+            console.debug(`${scriptInfo} Players:`, allPlayers);
+            console.debug(`${scriptInfo} Villages:`, villageData);
+            console.debug(`${scriptInfo} World Unit Info:`, worldUnitInfo);
+            console.debug(`${scriptInfo} World Config:`, worldConfig);
+            console.debug(`${scriptInfo} Village Map:`, villageMap);
+            console.debug(`${scriptInfo} allPlayers:`, allPlayers);
+            console.debug(`${scriptInfo} villageData:`, villageData);
+            console.debug(`${scriptInfo} ratio:`, ratio);
+            console.debug(`${scriptInfo} nightBonusActive:`, nightBonusActive);
+        }
 
         // Entry point
         (async function () {
             try {
                 renderUI();
                 addEventHandlers();
+                if (DEBUG) console.debug(`${scriptInfo} Ready!`);
             } catch (error) {
                 UI.ErrorMessage(twSDK.tt('There was an error!'));
                 console.error(`${scriptInfo} Error:`, error);
@@ -170,6 +216,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const dynamicUnitSelection = renderDynamicUnitSelection();
             const manualUnitSelection = renderManualUnitSelection();
             const arrivalTimeSelector = renderArrivalTimeSelector();
+
+            const ratioHide = (ratio === 0) ? 'style="display: none;"' : '';
+            const nightBonusActiveHide = (nightBonusActive) ? '' : 'style="display: none;"';
 
             const content = `
             <div class="fake-generator-data">
@@ -201,18 +250,38 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         </fieldset>
                     </div>
                 </div>
-                <div>
+                <div class="ra-mb10">
                     ${dynamicUnitSelection}
                 </div>
-                <div>
+                <div class="ra-mb10">
                     ${manualUnitSelection}
+                </div>
+                <div class="ra-mb10">
+                    <div class="sb-grid sb-grid-4">
+                        <fieldset class="sb-fieldset">
+                            <legend>${twSDK.tt('Total number of possible Attacks')}:</legend>
+                            <button id="calculateTotalPossibleAttacks" class="btn btn-confirm-yes onclick">${twSDK.tt('Calculate!')}</button>
+                        </fieldset>
+                        <fieldset class="sb-fieldset" ${ratioHide}>
+                            <legend>${twSDK.tt('Filter') + " " + ratio + ":1?"}</legend>
+                            <input type="checkbox" id="filterRatio" />
+                        </fieldset>
+                        <fieldset class="sb-fieldset" ${nightBonusActiveHide}>
+                            <legend>${twSDK.tt('Avoid attacks into night bonus?')}</legend>
+                            <input type="checkbox" id="avoidNightbonus" />
+                        </fieldset>
+                        <fieldset class="sb-fieldset" style="display: none;" id="bufferNightbonusDisplay">
+                            <legend>${twSDK.tt('Buffer to night bonus (in minutes)')}</legend>
+                            <input type="number" id="bufferNightbonus" />
+                        </fieldset>
+                    </div>
                 </div>
                 <div class="ra-mb10">
                     ${arrivalTimeSelector}
                 </div>
                 <div class="ra-mb10">
                     <fieldset class="sb-fieldset">
-                        <legend id="coordinates">${twSDK.tt('Coordinates')}:</legend>
+                        <legend id="coordinates">${twSDK.tt('Target Coordinates')}:</legend>
                         <textarea id="CoordInput" style="width: 100%" class="ra-textarea" placeholder="${twSDK.tt('Insert target coordinates here')}"></textarea>
                     </fieldset>
                 </div>
@@ -221,6 +290,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         ${twSDK.tt('Calculate Fakes')}
                     </a>
                 </div>
+            </div>
+            <div class="ra-mb10" style="display: none;" id="unusedCoordsDiv">
+                <fieldset class="sb-fieldset">
+                    <legend id="unusedCoordsLegend">${twSDK.tt('Unused Target Coordinates')}:</legend>
+                    <textarea id="unusedCoordsDisplay" style="width: 100%" class="ra-textarea" readonly></textarea>
+                </fieldset>
             </div>
             <div>
                 <div id="open_tabs" style="display: none;" class="ra-mb10">
@@ -239,6 +314,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
                 .sb-grid-5 {
                     grid-template-columns: repeat(5, 1fr);
+                }
+                .sb-grid-4 {
+                    grid-template-columns: repeat(4, 1fr);
                 }
                 .sb-grid-3 {
                     grid-template-columns: repeat(3, 1fr);
@@ -269,6 +347,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     border-radius: 3px;
                     width: 70px;
                 }
+
+                .sb-fieldset input[type="checkbox"] {
+                    margin-right: 5px;
+                    transform: scale(1.2);
+                }
+
                 .ra-table th img {
                     display: block;
                     margin: 0 auto;
@@ -362,8 +446,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     background: #c92722;
                     background: linear-gradient(to bottom, #c92722 0%,#a00d08 100%);
                 }
-
+                #calculateTotalPossibleAttacks {
+                    width: 100%;
+                }
             `;
+
 
             twSDK.renderBoxWidget(
                 content,
@@ -384,6 +471,68 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let localStorageSettings = getLocalStorage();
                 localStorageSettings.chosen_group = e.target.value;
                 saveLocalStorage(localStorageSettings);
+            });
+
+            // For the calculateTotalPossibleAttacks button
+            jQuery('#calculateTotalPossibleAttacks').on('click', async function () {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Calculate Total Possible Attacks`);
+                }
+                await updateTotalPossibleNumberOfAttacks();
+            });
+
+            // Init avoid nightbonus checkbox
+            let localStorageSettingsAvoidNightbonus = getLocalStorage();
+            jQuery('#avoidNightbonus').prop('checked', localStorageSettingsAvoidNightbonus.avoid_nightbonus);
+            // For the avoid nightbonus checkbox
+            jQuery('#avoidNightbonus').on('change', function (e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Avoid nightbonus: `, e.target.checked);
+                }
+                // Use setLocalStorage to update avoid_nightbonus value
+                let localStorageSettingsAvoidNightbonus = getLocalStorage();
+                localStorageSettingsAvoidNightbonus.avoid_nightbonus = e.target.checked;
+                saveLocalStorage(localStorageSettingsAvoidNightbonus);
+                if (e.target.checked) {
+                    jQuery('#bufferNightbonusDisplay').show();
+                } else {
+                    jQuery('#bufferNightbonusDisplay').hide();
+                }
+            });
+
+            // Init buffer nightbonus input
+            let localStorageSettingsBufferNightbonus = getLocalStorage();
+            jQuery('#bufferNightbonus').val(localStorageSettingsBufferNightbonus.buffer_nightbonus);
+            if (localStorageSettingsBufferNightbonus.avoid_nightbonus == true && nightBonusActive) {
+                jQuery('#bufferNightbonusDisplay').show();
+            } else {
+                jQuery('#bufferNightbonusDisplay').hide();
+            }
+            // For the buffer nightbonus input
+            jQuery('#bufferNightbonus').on('change', function (e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Buffer nightbonus: `, e.target.value);
+                }
+                // Use setLocalStorage to update buffer_nightbonus value
+                let localStorageSettingsBufferNightbonus = getLocalStorage();
+                localStorageSettingsBufferNightbonus.buffer_nightbonus = (parseInt(e.target.value) >= 0) ? e.target.value : NIGHT_BONUS_OFFSET;
+                e.target.value = localStorageSettingsBufferNightbonus.buffer_nightbonus;
+                saveLocalStorage(localStorageSettingsBufferNightbonus);
+            });
+
+            // Init filter ratio checkbox
+            let localStorageSettingsFilterRatio = getLocalStorage();
+            jQuery('#filterRatio').prop('checked', localStorageSettingsFilterRatio.filter_ratio);
+
+            // For the filter ratio checkbox
+            jQuery('#filterRatio').on('change', function (e) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Filter ratio: `, e.target.checked);
+                }
+                // Use setLocalStorage to update filter_ratio value
+                let localStorageSettingsFilterRatio = getLocalStorage();
+                localStorageSettingsFilterRatio.filter_ratio = e.target.checked;
+                saveLocalStorage(localStorageSettingsFilterRatio);
             });
 
             // For the Attacks per Button Option
@@ -551,7 +700,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             let target_coords = getLocalStorage().target_coordinates;
             if (target_coords && target_coords.length > 0) {
-                jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}: ${target_coords.length}`);
+                jQuery('#coordinates').text(`${twSDK.tt('Target Coordinates')}: ${target_coords.length}`);
             }
             jQuery('#CoordInput').val(target_coords.join(' '));
             // For the coord input text area
@@ -564,10 +713,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     amountOfCoords = coordinates.length;
                     existingCoordinates = coordinates.filter(coord => checkIfVillageExists(coord));
                     this.value = existingCoordinates.join(' ');
-                    jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}: ${existingCoordinates.length}`);
+                    jQuery('#coordinates').text(`${twSDK.tt('Target Coordinates')}: ${existingCoordinates.length}`);
                 } else {
                     this.value = '';
-                    jQuery('#coordinates').text(`${twSDK.tt("Coordinates")}:`);
+                    jQuery('#coordinates').text(`${twSDK.tt('Target Coordinates')}:`);
                 }
                 let endTime = new Date().getTime();
                 if (DEBUG) {
@@ -671,6 +820,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 e.preventDefault();
 
                 clearButtons();
+                jQuery('#unusedCoordsDiv').hide();
 
                 let playerVillages;
                 let targetCoords = [];
@@ -740,12 +890,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 return;
             }
 
-            //Filter arrays less than 1 in length, meaning only containing the target village and sorth them based on amount of player villages found
-            if (DEBUG) console.debug(`${scriptInfo} Unfiltered length of allCombinations: ${allCombinations.length}`);
-            allCombinations = allCombinations.filter((combination) => combination.length > 1);
             allCombinations.sort((a, b) => a.length - b.length);
-            let startingAmountOfComb = allCombinations.length;
-            if (DEBUG) console.debug(`${scriptInfo} Filtered length of allCombinations: ${startingAmountOfComb}`);
 
             //Initializing map to count the usage of each playerVillage
             let usedPlayerVillages = new Map();
@@ -760,18 +905,28 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitSelectionType = localStorageObject.unit_selection_type;
             const unitsToSend = localStorageObject.units_to_send;
             const unitsToKeep = localStorageObject.units_to_keep;
-            const keepCatapults = localStorageObject.keep_catapults;
             let startTimeWhile;
             let whileCounter;
+            let unusedCoords = [];
             if (DEBUG) {
                 startTimeWhile = new Date().getTime();
                 whileCounter = 0;
             }
             while (allCombinations.length > 0) {
                 if (DEBUG) whileCounter += 1;
-                let combination = allCombinations.shift();;
+                let combination = allCombinations.shift();
+
+                // Filter villages below ratio if ratio is active
+                if (ratio > 0) {
+                    if ((game_data.player.points / ratio) < parseInt(villageData[combination[0]][2])) {
+                        unusedCoords.push(combination[0]);
+                        continue;
+                    }
+                }
+
                 // Next loop if the combination only contains the target village
                 if (combination.length < 2) {
+                    unusedCoords.push(combination[0]);
                     continue;
                 }
                 // Sort player villages
@@ -781,6 +936,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let chosenVillage = null;
                 chosenVillage = chooseVillage(combination, fakeLimit, spySend, calculatedFakePairs, usedPlayerVillages)
                 if (!chosenVillage) {
+                    unusedCoords.push(combination[0]);
                     continue;
                 }
 
@@ -821,6 +977,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         allCombinations.sort((a, b) => a.length - b.length);
                     }
                 } else if (unitSelectionType == "dynamically") {
+                    minCat = getMinAmountOfCatapults(chosenVillage.points, fakeLimit);
                     if (chosenVillage.catapult < minCat || (spySend && chosenVillage.spy <= 0)) {
                         allCombinations = allCombinations.map(combination => {
                             return combination.filter(element => element !== chosenVillage);
@@ -876,9 +1033,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
             shuffleArray(generatedFakeLinks);
             if (DEBUG) console.debug(`${scriptInfo} One of the generated Links: ${generatedFakeLinks[0]}`);
+            if (DEBUG) console.debug(`${scriptInfo} Unused coords: ${unusedCoords}`);
             // Get end timestamp
             let endTime = new Date().getTime();
             if (DEBUG) console.debug(`${scriptInfo} The script took ${endTime - startTime} milliseconds to calculate ${calculatedFakePairs.length} fake pairs from ${amountOfCombinations} possible combinations.`);
+            if (unusedCoords.length > 0) {
+                jQuery('#unusedCoordsDiv').show();
+                jQuery('#unusedCoordsDisplay').val(unusedCoords.join(' '));
+                jQuery('#unusedCoordsLegend').text(`${twSDK.tt('Unused Target Coordinates')}: ${unusedCoords.length}`);
+            }
             createSendButtons(generatedFakeLinks);
             if (DEBUG) console.debug(`${scriptInfo} Finished`);
 
@@ -905,6 +1068,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitsToSend = localStorageObject.units_to_send;
             const keepCatapults = localStorageObject.keep_catapults;
             const arrivalTimes = localStorageObject.arrival_times;
+            const nightBonusOffset = parseInt(localStorageObject.buffer_nightbonus);
+            const avoidNightBonus = parseBool(localStorageObject.avoid_nightbonus);
             let playerVillagesWithEnoughUnits = [];
             if (unitSelectionType === "manually") {
                 // Subtract units_to_keep from player villages 
@@ -932,20 +1097,22 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             }
                         }
                         if (!timeBool) continue;
-                        const time = new Date(currentTime + travelTime);
-                        const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
-
                         // We want to arrive shortly before the night bonus to give the player time to send the attacks
-                        const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
-                        const checkEndNb = parseInt(nightInfo.end_hour);
+                        if (avoidNightBonus) {
+                            const time = new Date(currentTime + travelTime);
+                            const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
-                        // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
-                        if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
-                            nightBool = false; // edge case where start and end time are the same
-                        } else {
-                            nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (nightBonusOffset / 60)) % 24;  // Wrap around when subtracting offsett
+                            const checkEndNb = parseInt(nightInfo.end_hour);
+
+                            // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
+                            if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
+                                nightBool = false; // edge case where start and end time are the same
+                            } else {
+                                nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            }
+                            if (!nightBool) continue;
                         }
-                        if (!nightBool) continue;
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -986,20 +1153,20 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             }
                         }
                         if (!timeBool) continue;
-                        const time = new Date(currentTime + travelTime);
-                        const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
+                        if (avoidNightBonus) {
+                            const time = new Date(currentTime + travelTime);
+                            const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
-                        // We want to arrive shortly before the night bonus to give the player time to send the attacks
-                        const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (NIGHT_BONUS_OFFSET / 60)) % 24;  // Wrap around when subtracting offsett
-                        const checkEndNb = parseInt(nightInfo.end_hour);
+                            const checkStartNb = ((parseInt(nightInfo.start_hour) + 24) - (nightBonusOffset / 60)) % 24;  // Wrap around when subtracting offsett
+                            const checkEndNb = parseInt(nightInfo.end_hour);
 
-                        // Check if current time is less than the start of the night bonus or current time is greater than the end of the night bonus.
-                        if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
-                            nightBool = false; // edge case where start and end time are the same
-                        } else {
-                            nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            if (parseInt(nightInfo.start_hour) === parseInt(nightInfo.end_hour)) {
+                                nightBool = false; // edge case where start and end time are the same
+                            } else {
+                                nightBool = (currentTotalTime >= checkEndNb && currentTotalTime < checkStartNb);
+                            }
+                            if (!nightBool) continue;
                         }
-                        if (!nightBool) continue;
                         subArray.push(playerVillage);
                         amountOfCombinations += 1;
                     }
@@ -1111,9 +1278,88 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return chosenVillage;
         }
 
+        async function updateTotalPossibleNumberOfAttacks() {
+            if (Date.now() - LAST_REQUEST_TIME < STANDARD_DELAY) {
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Too many requests!`);
+                }
+                UI.ErrorMessage(twSDK.tt('Too many requests! Please wait a moment before trying again.'));
+                return;
+            }
+            LAST_REQUEST_TIME = Date.now();
+            let playerVillages;
+            const groupId = getLocalStorage().chosen_group;
+
+            try {
+                playerVillages = await fetchTroopsForCurrentGroup(parseInt(groupId));
+                if (DEBUG) {
+                    console.debug(`${scriptInfo} Player villages: `, playerVillages);
+                }
+            } catch (error) {
+                UI.ErrorMessage(twSDK.tt('There was an error!'));
+                console.error(`${scriptInfo} Error:`, error);
+                return;
+            }
+            let localStorageObject = getLocalStorage();
+            let totalPossibleAttacks = 0;
+            let spySend = localStorageObject.send_spy;
+            let units_to_send = localStorageObject.units_to_send;
+            let units_to_keep = localStorageObject.units_to_keep;
+            let keep_catapults = localStorageObject.keep_catapults;
+            let unitSelectionType = localStorageObject.unit_selection_type;
+            let max_attacks_per_village = parseInt(localStorageObject.max_attacks_per_village);
+
+            let keepCatapultsObject = createDefaultUnitsObject();
+            keepCatapultsObject["catapult"] = keep_catapults;
+
+            let unitsToSend = createDefaultUnitsObject();
+            if (unitSelectionType === "dynamically") {
+                if (spySend === "yes") {
+                    unitsToSend["spy"] = 1;
+                }
+            } else if (unitSelectionType === "manually") {
+                unitsToSend = units_to_send;
+            } else {
+                console.error("Invalid unit selection type", unitSelectionType)
+            }
+
+            for (let playerVillage of playerVillages) {
+                let numberOfAttacksOfThisVillage = 0;
+                if (unitSelectionType === "dynamically") {
+                    unitsToSend["catapult"] = getMinAmountOfCatapults(playerVillage.points, parseInt(worldConfig.config.game.fake_limit));
+                    subtractUnitsFromVillage(playerVillage, keepCatapultsObject);
+                } else if (unitSelectionType === "manually") {
+                    subtractUnitsFromVillage(playerVillage, units_to_keep);
+                } else {
+                    console.error("Invalid unit selection type", unitSelectionType)
+                }
+                while (isValidUnitsToSend(playerVillage, unitsToSend)) {
+                    totalPossibleAttacks += 1;
+                    numberOfAttacksOfThisVillage += 1;
+                    if (max_attacks_per_village > 0 && numberOfAttacksOfThisVillage >= max_attacks_per_village) {
+                        break;
+                    }
+                    subtractUnitsFromVillage(playerVillage, unitsToSend);
+                }
+            }
+            jQuery('#calculateTotalPossibleAttacks').text(`${totalPossibleAttacks}`);
+        }
+
+        // Helper: Parses boolean
+        function parseBool(input) {
+            if (typeof input === 'string') {
+                return input.toLowerCase() === 'true';
+            } else if (typeof input === 'boolean') {
+                return input;
+            } else {
+                console.error(`${scriptInfo}: Invalid input: needs to be a string or boolean.`);
+                return false;
+            }
+        }
+
         // Helper: Checks if the village has enough units
         function isValidUnitsToSend(playerVillage, unitsToSend) {
-            atLeastOneUnitToSend = false;
+            let atLeastOneUnitToSend = false;
             for (const unitType in unitsToSend) {
                 const requiredUnits = unitsToSend[unitType];
                 const availableUnits = playerVillage[unitType];
@@ -1160,7 +1406,12 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Helper: Function to generate a link from villageIds
         function generateLink(villageId1, villageId2, unitObject, unchangedTroopData, unitsToKeep) {
             let completeLink = getCurrentURL();
-            completeLink += `${twSDK.sitterId}?village=${villageId1}&screen=place&target=${villageId2}`;
+            if (twSDK.sitterId.length > 0) {
+                completeLink += `?${twSDK.sitterId}&village=${villageId1}&screen=place&target=${villageId2}`;
+            } else {
+                completeLink += `?village=${villageId1}&screen=place&target=${villageId2}`;
+            }
+
             let unitAmount;
 
             const villageData = unchangedTroopData.find(village => village.villageId == villageId1);
@@ -1202,23 +1453,49 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         // Helper: Villages array to dictionary, to quickly search with coordinates
         function villageArrayToDict(villageArray) {
             let dict = {};
+            let playerPoints;
             for (let i = 0; i < villageArray.length; i++) {
                 let key = villageArray[i][2] + '|' + villageArray[i][3]; //assuming x is at arr[i][2] and y is at arr[i][3]
-                dict[key] = [villageArray[i][0], villageArray[i][5]];   //assuming id is at arr[i][0] and points is at arr[i][5]
+                let playerId = villageArray[i][4]; //assuming player id is at arr[i][4]
+                if (parseInt(playerId) === 0) {
+                    playerPoints = 9999999999; // barbs get alot of points to always avoid ratio filter
+                } else {
+                    playerPoints = allPlayers.get(playerId)[3]; //assuming player points is at index 3 in the player array
+                }
+                dict[key] = [villageArray[i][0], villageArray[i][5], playerPoints]; //assuming id is at arr[i][0] and points is at arr[i][5]
             }
             return dict;
         }
 
+        // Helper: Creates village map that maps villageid to village coords
+        function createVillageMap(villageArray) {
+            let villageMap = new Map();
+            for (let i = 0; i < villageArray.length; i++) {
+                let villageId = villageArray[i][0];
+                let villageCoord = villageArray[i][2] + '|' + villageArray[i][3];
+                villageMap.set(parseInt(villageId), villageCoord);
+            }
+            return villageMap;
+        }
+
         // Helper:  Get Village ID from a coordinate
         function getVillageIdFromCoord(coord) {
-            let village = villageData[coord];
-            return village[0];
+            try {
+                let village = villageData[coord];
+                return village[0];
+            } catch (error) {
+                console.warn(`No village found for coordinate ${coord}`);
+            }
         }
 
         // Helper: Get village points from village.txt with coordinates
         function getVillagePointsFromCoord(coord) {
-            let village = villageData[coord];
-            return village[1];
+            try {
+                let village = villageData[coord];
+                return village[1];
+            } catch (error) {
+                console.warn(`No village found for coordinate ${coord}`);
+            }
         }
 
         function shuffleArray(array) {
@@ -1277,7 +1554,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             // Reset the buttons
             openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>`;
-            // Make the 'open_tabs' div visible
+            // Make the 'open_tabs' div invisible
             openTabsDiv.style.display = "none";
         }
 
@@ -1528,80 +1805,107 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         }
         // Helper: Fetch home troop counts for current group
         async function fetchTroopsForCurrentGroup(groupId) {
-            const mobileCheck = $('#mobileHeader').length > 0;
-            const troopsForGroup = await jQuery.get(game_data.link_base_pure + `overview_villages&mode=combined&group=${groupId}&page=-1`).then(async (response) => {
-                const htmlDoc = jQuery.parseHTML(response);
-                const homeTroops = [];
+            const mobileCheck = jQuery('#mobileHeader').length > 0;
+            const troopsForGroup = await jQuery
+                .get(
+                    game_data.link_base_pure +
+                    `overview_villages&mode=combined&group=${groupId}&page=-1`
+                )
+                .then(async (response) => {
+                    const htmlDoc = jQuery.parseHTML(response);
+                    const homeTroops = [];
 
-                if (mobileCheck) {
-                    let table = jQuery(htmlDoc).find('#combined_table tr.nowrap');
-                    for (let i = 0; i < table.length; i++) {
-                        let objTroops = {};
-                        let coord = table[i].getElementsByClassName('quickedit-label')[0].innerHTML;
-                        let villageId = parseInt(table[i].getElementsByClassName('quickedit-vn')[0].getAttribute('data-id'));
-                        let listTroops = Array.from(table[i].getElementsByTagName('img')).filter((e) => e.src.includes('unit')).map((e) => ({
-                            name: e.src.split('unit_')[1].replace('@2x.png', ''),
-                            value: parseInt(e.parentElement.nextElementSibling.innerText),
-                        }));
-                        listTroops.forEach((item) => {
-                            objTroops[item.name] = item.value;
+                    if (mobileCheck) {
+                        let table = jQuery(htmlDoc).find('#combined_table tr.nowrap');
+                        for (let i = 0; i < table.length; i++) {
+                            let objTroops = {};
+                            let villageId = parseInt(
+                                table[i]
+                                    .getElementsByClassName('quickedit-vn')[0]
+                                    .getAttribute('data-id')
+                            );
+                            let listTroops = Array.from(
+                                table[i].getElementsByTagName('img')
+                            )
+                                .filter((e) => e.src.includes('unit'))
+                                .map((e) => ({
+                                    name: e.src
+                                        .split('unit_')[1]
+                                        .replace('@2x.png', ''),
+                                    value: parseInt(
+                                        e.parentElement.nextElementSibling.innerText
+                                    ),
+                                }));
+                            listTroops.forEach((item) => {
+                                objTroops[item.name] = item.value;
+                            });
+
+                            objTroops.villageId = villageId;
+                            objTroops.coord = villageMap.get(parseInt(villageId));
+
+                            homeTroops.push(objTroops);
                         }
+                    } else {
+                        const combinedTableRows = jQuery(htmlDoc).find(
+                            '#combined_table tr.nowrap'
                         );
-                        objTroops.coord = getLastMatch(coord);
-                        objTroops.villageId = villageId;
+                        const combinedTableHead = jQuery(htmlDoc).find(
+                            '#combined_table tr:eq(0) th'
+                        );
 
-                        homeTroops.push(objTroops);
-                    }
-                } else {
-                    const combinedTableRows = jQuery(htmlDoc).find('#combined_table tr.nowrap');
-                    const combinedTableHead = jQuery(htmlDoc).find('#combined_table tr:eq(0) th');
+                        const combinedTableHeader = [];
 
-                    const combinedTableHeader = [];
-
-                    // Collect possible buildings and troop types
-                    jQuery(combinedTableHead).each(function () {
-                        const thImage = jQuery(this).find('img').attr('src');
-                        if (thImage) {
-                            let thImageFilename = thImage.split('/').pop();
-                            thImageFilename = thImageFilename.replace('.png', '');
-                            combinedTableHeader.push(thImageFilename);
-                        } else {
-                            combinedTableHeader.push(null);
-                        }
-                    });
-
-                    // Collect possible troop types
-                    combinedTableRows.each(function () {
-                        let rowTroops = {};
-
-                        combinedTableHeader.forEach((tableHeader, index) => {
-                            if (tableHeader) {
-                                if (tableHeader.includes('unit_')) {
-                                    const coord = twSDK.getCoordFromString(jQuery(this).find('td:eq(1) span.quickedit-label').text());
-                                    const villageId = jQuery(this).find('td:eq(1) span.quickedit-vn').attr('data-id');
-                                    const unitType = tableHeader.replace('unit_', '');
-                                    rowTroops = {
-                                        ...rowTroops,
-                                        villageId: parseInt(villageId),
-                                        coord: coord,
-                                        [unitType]: parseInt(jQuery(this).find(`td:eq(${index})`).text()),
-                                    };
-                                }
+                        // collect possible buildings and troop types
+                        jQuery(combinedTableHead).each(function () {
+                            const thImage = jQuery(this).find('img').attr('src');
+                            if (thImage) {
+                                let thImageFilename = thImage.split('/').pop();
+                                thImageFilename = thImageFilename.replace('.png', '');
+                                combinedTableHeader.push(thImageFilename);
+                            } else {
+                                combinedTableHeader.push(null);
                             }
-                        }
-                        );
+                        });
 
-                        homeTroops.push(rowTroops);
-                    });
-                }
+                        // collect possible troop types
+                        combinedTableRows.each(function () {
+                            let rowTroops = {};
 
-                return homeTroops;
-            }
-            ).catch((error) => {
-                UI.ErrorMessage(tt('An error occured while fetching troop counts!'));
-                console.error(`${scriptInfo} Error:`, error);
-            }
-            );
+                            combinedTableHeader.forEach((tableHeader, index) => {
+                                if (tableHeader) {
+                                    if (tableHeader.includes('unit_')) {
+                                        const villageId = jQuery(this)
+                                            .find('td:eq(1) span.quickedit-vn')
+                                            .attr('data-id');
+                                        const unitType = tableHeader.replace(
+                                            'unit_',
+                                            ''
+                                        );
+                                        rowTroops = {
+                                            ...rowTroops,
+                                            villageId: parseInt(villageId),
+                                            [unitType]: parseInt(
+                                                jQuery(this)
+                                                    .find(`td:eq(${index})`)
+                                                    .text()
+                                            ),
+                                        };
+                                    }
+                                }
+                            });
+                            rowTroops.coord = villageMap.get(parseInt(rowTroops.villageId));
+                            homeTroops.push(rowTroops);
+                        });
+                    }
+
+                    return homeTroops;
+                })
+                .catch((error) => {
+                    UI.ErrorMessage(
+                        twSDK.tt('There was an error while fetching the data!')
+                    );
+                    console.error(`${scriptInfo} Error:`, error);
+                });
 
             return troopsForGroup;
         }
@@ -1649,31 +1953,23 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             document.getElementById('arrivalTimeFieldset').appendChild(entriesTable);
         }
 
-        function getLastMatch(inputString) {
-            const regex = COORD_REGEX;
-            let lastMatch = null;
-            let match;
-
-            while ((match = regex.exec(inputString)) !== null) {
-                lastMatch = match[0];
-            }
-
-            return lastMatch;
-        }
-
         function resetInput() {
+            localStorageObject = getLocalStorage();
             const defaultSettings = {
                 chosen_group: 0,
                 attack_per_button: DEFAULT_ATTACKS_PER_BUTTON,
                 delay: DEFAULT_DELAY,
-                unit_selection_type: 'dynamically',
+                unit_selection_type: localStorageObject.unit_selection_type,
                 max_attacks_per_village: DEFAULT_MAX_ATTACKS_PER_VILLAGE,
                 send_spy: 'yes',
                 keep_catapults: 0,
                 units_to_send: {},
                 units_to_keep: {},
-                arrival_times: [],
-                target_coordinates: []
+                arrival_times: localStorageObject.arrival_times,
+                target_coordinates: [],
+                filter_ratio: false,
+                avoid_nightbonus: true,
+                buffer_nightbonus: NIGHT_BONUS_OFFSET,
             };
 
             // Initialize units_to_send and units_to_keep with each unit set to 0
@@ -1697,7 +1993,29 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         function getLocalStorage() {
             const localStorageSettings = localStorage.getItem('sbFakegeneratorSettings');
 
+            expectedSettings = [
+                'chosen_group',
+                'attack_per_button',
+                'delay',
+                'unit_selection_type',
+                'max_attacks_per_village',
+                'send_spy',
+                'keep_catapults',
+                'units_to_send',
+                'units_to_keep',
+                'arrival_times',
+                'target_coordinates',
+                'filter_ratio',
+                'avoid_nightbonus',
+                'buffer_nightbonus'
+            ]
+            let missingSettings = []
             if (localStorageSettings) {
+                // Check if all expected settings are present in localStorage
+                missingSettings = expectedSettings.filter(setting => !localStorageSettings.includes(setting));
+            }
+
+            if (localStorageSettings && missingSettings.length === 0) {
                 // If settings exist in localStorage, parse and return the object
                 return JSON.parse(localStorageSettings);
             } else {
@@ -1713,7 +2031,10 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     units_to_send: {},
                     units_to_keep: {},
                     arrival_times: [],
-                    target_coordinates: []
+                    target_coordinates: [],
+                    filter_ratio: false,
+                    avoid_nightbonus: true,
+                    buffer_nightbonus: NIGHT_BONUS_OFFSET,
                 };
 
                 // Initialize units_to_send and units_to_keep with each unit set to 0
@@ -1738,8 +2059,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             try {
                 const worldUnitInfo = await twSDK.getWorldUnitInfo();
                 const villages = await twSDK.worldDataAPI('village');
+                const players = await twSDK.worldDataAPI('player');
                 const worldConfig = await twSDK.getWorldConfig();
-                return { villages, worldUnitInfo, worldConfig };
+                return { players, villages, worldUnitInfo, worldConfig };
             } catch (error) {
                 UI.ErrorMessage(
                     twSDK.tt('There was an error while fetching the data!')

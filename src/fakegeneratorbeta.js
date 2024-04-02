@@ -10,7 +10,6 @@
 * Mod: RedAlert
 */
 
-
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
@@ -174,22 +173,29 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         UI.InfoMessage(twSDK.tt('Loading...'));
         const groups = await fetchVillageGroups();
         const { players, villages, worldUnitInfo, worldConfig } = await fetchWorldConfigData();
-        console.log('players', players);
-        console.log('villages', villages);
-        console.log('worldUnitInfo', worldUnitInfo);
-        console.log('worldConfig', worldConfig);
         if (players.length < 1 || villages.length < 1 || !worldUnitInfo || !worldConfig) {
             UI.ErrorMessage('One or more of the fetched world data is empty.', 5000);
             return;
         }
-
-
+        const villageMap = createVillageMap(villages);
         const allPlayers = new Map(players.map(player => [player[0], player.slice(1)]));
-        const villageData = villageArrayToDict(villages);
+        const villageData = villageArrayToDict(villages)
 
-        const ratio = worldConfig.config.newbie.ratio;
+        const ratio = parseInt(worldConfig.config.newbie.ratio);
         const nightBonusActive = (worldConfig.config.night.active === '1') ? true : false;
 
+        if (DEBUG) {
+            console.debug(`${scriptInfo} Groups:`, groups);
+            console.debug(`${scriptInfo} Players:`, allPlayers);
+            console.debug(`${scriptInfo} Villages:`, villageData);
+            console.debug(`${scriptInfo} World Unit Info:`, worldUnitInfo);
+            console.debug(`${scriptInfo} World Config:`, worldConfig);
+            console.debug(`${scriptInfo} Village Map:`, villageMap);
+            console.debug(`${scriptInfo} allPlayers:`, allPlayers);
+            console.debug(`${scriptInfo} villageData:`, villageData);
+            console.debug(`${scriptInfo} ratio:`, ratio);
+            console.debug(`${scriptInfo} nightBonusActive:`, nightBonusActive);
+        }
 
         // Entry point
         (async function () {
@@ -1461,16 +1467,35 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return dict;
         }
 
+        // Helper: Creates village map that maps villageid to village coords
+        function createVillageMap(villageArray) {
+            let villageMap = new Map();
+            for (let i = 0; i < villageArray.length; i++) {
+                let villageId = villageArray[i][0];
+                let villageCoord = villageArray[i][2] + '|' + villageArray[i][3];
+                villageMap.set(parseInt(villageId), villageCoord);
+            }
+            return villageMap;
+        }
+
         // Helper:  Get Village ID from a coordinate
         function getVillageIdFromCoord(coord) {
-            let village = villageData[coord];
-            return village[0];
+            try {
+                let village = villageData[coord];
+                return village[0];
+            } catch (error) {
+                console.warn(`No village found for coordinate ${coord}`);
+            }
         }
 
         // Helper: Get village points from village.txt with coordinates
         function getVillagePointsFromCoord(coord) {
-            let village = villageData[coord];
-            return village[1];
+            try {
+                let village = villageData[coord];
+                return village[1];
+            } catch (error) {
+                console.warn(`No village found for coordinate ${coord}`);
+            }
         }
 
         function shuffleArray(array) {
@@ -1816,6 +1841,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                             });
 
                             objTroops.villageId = villageId;
+                            objTroops.coord = villageMap.get(parseInt(villageId));
 
                             homeTroops.push(objTroops);
                         }
@@ -1867,7 +1893,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                                     }
                                 }
                             });
-
+                            rowTroops.coord = villageMap.get(parseInt(rowTroops.villageId));
                             homeTroops.push(rowTroops);
                         });
                     }

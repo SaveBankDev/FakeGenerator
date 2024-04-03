@@ -920,7 +920,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 // Filter villages below ratio if ratio is active
                 if (ratio > 0 && ratioBool) {
                     if ((game_data.player.points / ratio) > parseInt(villageData[combination[0]][2])) {
-                        unusedCoords.push(combination[0]);
                         continue;
                     }
                 }

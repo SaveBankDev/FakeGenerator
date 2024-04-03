@@ -905,6 +905,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitSelectionType = localStorageObject.unit_selection_type;
             const unitsToSend = localStorageObject.units_to_send;
             const unitsToKeep = localStorageObject.units_to_keep;
+            const ratioBool = parseBool(localStorageObject.filter_ratio);
             let startTimeWhile;
             let whileCounter;
             let unusedCoords = [];
@@ -917,8 +918,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let combination = allCombinations.shift();
 
                 // Filter villages below ratio if ratio is active
-                if (ratio > 0) {
-                    if ((game_data.player.points / ratio) < parseInt(villageData[combination[0]][2])) {
+                if (ratio > 0 && ratioBool) {
+                    if ((game_data.player.points / ratio) > parseInt(villageData[combination[0]][2])) {
                         unusedCoords.push(combination[0]);
                         continue;
                     }

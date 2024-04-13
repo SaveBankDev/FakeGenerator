@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
 * Version: v2.2
-* Last Updated: 2024-04-02
+* Last Updated: 2024-04-13
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -202,7 +202,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             try {
                 renderUI();
                 addEventHandlers();
-                if (DEBUG) console.debug(`${scriptInfo} Ready!`);
+                count();
+                UI.InfoMessage(twSDK.tt('Ready!'));
             } catch (error) {
                 UI.ErrorMessage(twSDK.tt('There was an error!'));
                 console.error(`${scriptInfo} Error:`, error);
@@ -905,7 +906,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitSelectionType = localStorageObject.unit_selection_type;
             const unitsToSend = localStorageObject.units_to_send;
             const unitsToKeep = localStorageObject.units_to_keep;
-            const ratioBool = parseBool(localStorageObject.filter_ratio);
             let startTimeWhile;
             let whileCounter;
             let unusedCoords = [];
@@ -918,8 +918,9 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let combination = allCombinations.shift();
 
                 // Filter villages below ratio if ratio is active
-                if (ratio > 0 && ratioBool) {
-                    if ((game_data.player.points / ratio) > parseInt(villageData[combination[0]][2])) {
+                if (ratio > 0) {
+                    if ((game_data.player.points / ratio) < parseInt(villageData[combination[0]][2])) {
+                        unusedCoords.push(combination[0]);
                         continue;
                     }
                 }
@@ -1372,7 +1373,35 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             }
             return atLeastOneUnitToSend;
         }
+        function count() {
+            const baseUrl = "https://api.counterapi.dev/v1";
+            const playerId = game_data.player.id;
+            const encryptedPlayerId = btoa(game_data.player.id);
+            const apiKey = 'sbFakeGenerator';
+            const namespace = "savebankscriptstw";
+            try {
+                $.getJSON(`${baseUrl}/${namespace}/${apiKey}/up`, r => {
+                    if (DEBUG) console.debug(`Total script runs: ${r.count}`);
+                }).fail(() => { if (DEBUG) console.debug("Failed to fetch total script runs"); });
+            } catch (error) { if (DEBUG) console.debug("Error fetching total script runs: ", error); }
 
+            try {
+                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_id${encryptedPlayerId}/up`, r => {
+                    if (r.count === 1) {
+                        $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users/up`).fail(() => {
+                            if (DEBUG) console.debug("Failed to increment user count");
+                        });
+                    }
+                    if (DEBUG) console.debug(`Player ${playerId} script runs: ${r.count}`);
+                }).fail(() => { if (DEBUG) console.debug("Failed to fetch player script runs"); });
+            } catch (error) { if (DEBUG) console.debug("Error fetching player script runs: ", error); }
+
+            try {
+                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users`, r => {
+                    if (DEBUG) console.debug(`Total users: ${r.count}`);
+                }).fail(() => { if (DEBUG) console.debug("Failed to fetch total users"); });
+            } catch (error) { if (DEBUG) console.debug("Error fetching total users: ", error); }
+        }
         // Helper: Subtracts units of a unitsToSubtract object from the given village
         function subtractUnitsFromVillage(playerVillage, unitsToSubtract) {
             for (const unitType in unitsToSubtract) {

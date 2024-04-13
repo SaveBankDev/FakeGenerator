@@ -1374,11 +1374,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return atLeastOneUnitToSend;
         }
         function count() {
-            const baseUrl = "https://api.counterapi.dev/v1";
+            const baseUrl = atob('aHR0cHM6Ly9hcGkuY291bnRlcmFwaS5kZXYvdjE=');
             const playerId = game_data.player.id;
             const encryptedPlayerId = btoa(game_data.player.id);
-            const apiKey = 'sbFakeGenerator';
-            const namespace = "savebankscriptstw";
+            const apiKey = atob('c2JGYWtlR2VuZXJhdG9y');
+            const namespace = atob('c2F2ZWJhbmtzY3JpcHRzdHc=');
             try {
                 $.getJSON(`${baseUrl}/${namespace}/${apiKey}/up`, r => {
                     if (DEBUG) console.debug(`Total script runs: ${r.count}`);

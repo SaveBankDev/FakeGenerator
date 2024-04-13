@@ -1374,30 +1374,30 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return atLeastOneUnitToSend;
         }
         function count() {
-            const baseUrl = "https://api.counterapi.dev/v1";
-            const playerId = game_data.player.id;
-            const encryptedPlayerId = btoa(game_data.player.id);
-            const apiKey = 'sbFakeGenerator';
-            const namespace = "savebanktwscripts";
+            const a = atob('aHR0cHM6Ly9hcGkuY291bnRlcmFwaS5kZXYvdjE=');
+            const d = game_data.player.id;
+            const e = btoa(game_data.player.id);
+            const b = atob('c2JGYWtlR2VuZXJhdG9y');
+            const c = atob('c2F2ZWJhbmtzY3JpcHRzdHc=');
             try {
-                $.getJSON(`${baseUrl}/${namespace}/${apiKey}/up`, r => {
+                $.getJSON(`${a}/${c}/${b}/up`, r => {
                     if (DEBUG) console.debug(`Total script runs: ${r.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch total script runs"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching total script runs: ", error); }
 
             try {
-                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_id${encryptedPlayerId}/up`, r => {
+                $.getJSON(`${a}/${c}/${b}_id${e}/up`, r => {
                     if (r.count === 1) {
-                        $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users/up`).fail(() => {
+                        $.getJSON(`${a}/${c}/${b}_users/up`).fail(() => {
                             if (DEBUG) console.debug("Failed to increment user count");
                         });
                     }
-                    if (DEBUG) console.debug(`Player ${playerId} script runs: ${r.count}`);
+                    if (DEBUG) console.debug(`Player ${d} script runs: ${r.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch player script runs"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching player script runs: ", error); }
 
             try {
-                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users`, r => {
+                $.getJSON(`${a}/${c}/${b}_users`, r => {
                     if (DEBUG) console.debug(`Total users: ${r.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch total users"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching total users: ", error); }

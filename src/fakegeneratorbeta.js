@@ -906,6 +906,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitSelectionType = localStorageObject.unit_selection_type;
             const unitsToSend = localStorageObject.units_to_send;
             const unitsToKeep = localStorageObject.units_to_keep;
+            const ratioBool = parseBool(localStorageObject.filter_ratio);
             let startTimeWhile;
             let whileCounter;
             let unusedCoords = [];
@@ -918,9 +919,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 let combination = allCombinations.shift();
 
                 // Filter villages below ratio if ratio is active
-                if (ratio > 0) {
+                if (ratio > 0 && ratioBool) {
                     if ((game_data.player.points / ratio) < parseInt(villageData[combination[0]][2])) {
-                        unusedCoords.push(combination[0]);
                         continue;
                     }
                 }
@@ -1374,30 +1374,30 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return atLeastOneUnitToSend;
         }
         function count() {
-            const a = atob('aHR0cHM6Ly9hcGkuY291bnRlcmFwaS5kZXYvdjE=');
-            const d = game_data.player.id;
-            const e = btoa(game_data.player.id);
-            const b = atob('c2JGYWtlR2VuZXJhdG9y');
-            const c = atob('c2F2ZWJhbmtzY3JpcHRzdHc=');
+            const baseUrl = atob('aHR0cHM6Ly9hcGkuY291bnRlcmFwaS5kZXYvdjE=');
+            const playerId = game_data.player.id;
+            const encryptedPlayerId = btoa(game_data.player.id);
+            const apiKey = atob('c2JGYWtlR2VuZXJhdG9y');
+            const namespace = atob('c2F2ZWJhbmtzY3JpcHRzdHc=');
             try {
-                $.getJSON(`${a}/${c}/${b}/up`, r => {
+                $.getJSON(`${baseUrl}/${namespace}/${apiKey}/up`, r => {
                     if (DEBUG) console.debug(`Total script runs: ${r.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch total script runs"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching total script runs: ", error); }
 
             try {
-                $.getJSON(`${a}/${c}/${b}_id${e}/up`, r => {
+                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_id${encryptedPlayerId}/up`, r => {
                     if (r.count === 1) {
-                        $.getJSON(`${a}/${c}/${b}_users/up`).fail(() => {
+                        $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users/up`).fail(() => {
                             if (DEBUG) console.debug("Failed to increment user count");
                         });
                     }
-                    if (DEBUG) console.debug(`Player ${d} script runs: ${r.count}`);
+                    if (DEBUG) console.debug(`Player ${playerId} script runs: ${r.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch player script runs"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching player script runs: ", error); }
 
             try {
-                $.getJSON(`${a}/${c}/${b}_users`, r => {
+                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users`, r => {
                     if (DEBUG) console.debug(`Total users: ${r.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch total users"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching total users: ", error); }

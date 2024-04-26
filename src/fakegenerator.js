@@ -1457,7 +1457,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 } else if (unitObject[unitType] === -1 && villageData[unitType] >= 0) {
                     // If the value is -1, use the value from unchangedTroopData if available
                     if (unitsToKeep[unitType] >= 0) {
-                        unitAmount = (villageData[unitType] - unitsToKeep[unitType]) > 0 ? (villageData[unitType] - unitsToKeep[unitType]) : 0;
+                        unitAmount = (villageData[unitType] - unitsToKeep[unitType]) > 0 ? (villageData[unitType] - unitsToKeep[unitType]) : 0; // hope this works
                     } else {
                         unitAmount = 0;
                         console.error("Too many -1, idk whats going on")

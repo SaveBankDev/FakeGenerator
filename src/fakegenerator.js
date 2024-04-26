@@ -1360,7 +1360,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
         // Helper: Checks if the village has enough units
         function isValidUnitsToSend(playerVillage, unitsToSend) {
-            unitsToKeep = getLocalStorage().units_to_keep;
             let atLeastOneUnitToSend = false;
             for (const unitType in unitsToSend) {
                 const requiredUnits = unitsToSend[unitType];
@@ -1372,7 +1371,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     return false;
                 }
             }
-            return atLeastOneUnitToSend && !cantSendOneUnit;
+            return atLeastOneUnitToSend;
         }
         function count() {
             const apiUrl = 'https://api.counterapi.dev/v1';

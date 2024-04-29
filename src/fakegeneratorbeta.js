@@ -920,7 +920,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
                 // Filter villages below ratio if ratio is active
                 if (ratio > 0 && ratioBool) {
-                    if ((game_data.player.points / ratio) < parseInt(villageData[combination[0]][2])) {
+                    if (parseInt(villageData[combination[0]][2]) < (game_data.player.points / ratio)) {
                         continue;
                     }
                 }
@@ -1374,31 +1374,31 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return atLeastOneUnitToSend;
         }
         function count() {
-            const baseUrl = atob('aHR0cHM6Ly9hcGkuY291bnRlcmFwaS5kZXYvdjE=');
+            const apiUrl = 'https://api.counterapi.dev/v1';
             const playerId = game_data.player.id;
-            const encryptedPlayerId = btoa(game_data.player.id);
-            const apiKey = atob('c2JGYWtlR2VuZXJhdG9y');
-            const namespace = atob('c2F2ZWJhbmtzY3JpcHRzdHc=');
+            const encodedPlayerId = btoa(game_data.player.id);
+            const apiKey = 'sbFakeGenerator'; // api key
+            const namespace = 'savebankscriptstw'; // namespace
             try {
-                $.getJSON(`${baseUrl}/${namespace}/${apiKey}/up`, r => {
-                    if (DEBUG) console.debug(`Total script runs: ${r.count}`);
+                $.getJSON(`${apiUrl}/${namespace}/${apiKey}/up`, response => {
+                    if (DEBUG) console.debug(`Total script runs: ${response.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch total script runs"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching total script runs: ", error); }
 
             try {
-                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_id${encryptedPlayerId}/up`, r => {
-                    if (r.count === 1) {
-                        $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users/up`).fail(() => {
+                $.getJSON(`${apiUrl}/${namespace}/${apiKey}_id${encodedPlayerId}/up`, response => {
+                    if (response.count === 1) {
+                        $.getJSON(`${apiUrl}/${namespace}/${apiKey}_users/up`).fail(() => {
                             if (DEBUG) console.debug("Failed to increment user count");
                         });
                     }
-                    if (DEBUG) console.debug(`Player ${playerId} script runs: ${r.count}`);
+                    if (DEBUG) console.debug(`Player ${playerId} script runs: ${response.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch player script runs"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching player script runs: ", error); }
 
             try {
-                $.getJSON(`${baseUrl}/${namespace}/${apiKey}_users`, r => {
-                    if (DEBUG) console.debug(`Total users: ${r.count}`);
+                $.getJSON(`${apiUrl}/${namespace}/${apiKey}_users`, response => {
+                    if (DEBUG) console.debug(`Total users: ${response.count}`);
                 }).fail(() => { if (DEBUG) console.debug("Failed to fetch total users"); });
             } catch (error) { if (DEBUG) console.debug("Error fetching total users: ", error); }
         }
@@ -1456,7 +1456,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 } else if (unitObject[unitType] === -1 && villageData[unitType] >= 0) {
                     // If the value is -1, use the value from unchangedTroopData if available
                     if (unitsToKeep[unitType] >= 0) {
-                        unitAmount = villageData[unitType] - unitsToKeep[unitType];
+                        unitAmount = (villageData[unitType] - unitsToKeep[unitType]) > 0 ? (villageData[unitType] - unitsToKeep[unitType]) : 0; // hope this works
                     } else {
                         unitAmount = 0;
                         console.error("Too many -1, idk whats going on")

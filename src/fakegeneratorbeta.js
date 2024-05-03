@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.2
-* Last Updated: 2024-04-13
+* Version: v2.3
+* Last Updated: 2024-04-29
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -40,12 +40,14 @@ var TROOP_POP = {
     snob: 100,
 }
 
+var ALL_ATTACKS = [];
+
 
 var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.2',
+        version: 'v2.3',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -96,6 +98,9 @@ var scriptConfig = {
             'Calculate!': 'Calculate!',
             'Too many requests! Please wait a moment before trying again.': 'Too many requests! Please wait a moment before trying again.',
             'One or more of the fetched world configuration data is empty.': 'One or more of the fetched world configuration data is empty.',
+            'Export WB': 'Export WB',
+            'No attacks to export!': 'No attacks to export!',
+            'Exported and copied to clipboard': 'Exported and copied to clipboard',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -142,6 +147,9 @@ var scriptConfig = {
             'Calculate!': 'Berechnen!',
             'Too many requests! Please wait a moment before trying again.': 'Zu viele Anfragen! Bitte warten Sie einen Moment, bevor Sie es erneut versuchen.',
             'One or more of the fetched world configuration data is empty.': 'Eine oder mehrere der abgerufenen Weltkonfigurationsdaten sind leer.',
+            'Export WB': 'Export WB',
+            'No attacks to export!': 'Keine Angriffe zum Exportieren!',
+            'Exported and copied to clipboard': 'Exportiert und in die Zwischenablage kopiert',
         }
     },
     allowedMarkets: [],
@@ -299,8 +307,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 </fieldset>
             </div>
             <div>
-                <div id="open_tabs" style="display: none;" class="ra-mb10">
-                    <h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>
+                <div id="open_tabs" style="display: none;" class="ra-mb10 sb-grid sb-grid-2">
+                    <div>
+                        <h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>
+                    </div>
+                    <div>
+                        <button id="exportPlanFG" class="btn onclick">${twSDK.tt('Export WB')}</button>
+                    </div>
                 </div>
             </div>`;
             const style = `
@@ -814,13 +827,24 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 }
             });
             jQuery('#resetInput').on('click', function () {
+                if (DEBUG) console.debug(`${scriptInfo} Reset Input`);
                 resetInput();
+            });
+            jQuery('#exportPlanFG').on('click', function () {
+                if (DEBUG) console.debug(`${scriptInfo} Export Plan`);
+                exportAttacks();
+                UI.InfoMessage(twSDK.tt('Exported and copied to clipboard'));
             });
             // For the Calculate Fakes Button
             jQuery('#calculateFakes').on('click', async function (e) {
                 e.preventDefault();
 
                 clearButtons();
+                jQuery('#exportPlanFG').on('click', function () {
+                    if (DEBUG) console.debug(`${scriptInfo} Export Plan`);
+                    exportAttacks();
+                    UI.InfoMessage(twSDK.tt('Exported and copied to clipboard'));
+                });
                 jQuery('#unusedCoordsDiv').hide();
 
                 let playerVillages;
@@ -876,6 +900,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
         function calculateAttacks(playerVillages, targetCoords, nightInfo, fakeLimit, configSpeed, spySend, unchangedTroopData) {
             // Time to calculate calculation time
             let startTime = new Date().getTime();
+            ALL_ATTACKS = [];
             let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend);
             if (DEBUG) {
                 let endTimeGetAll = new Date().getTime();
@@ -1021,12 +1046,46 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             if (spySend) {
                 unitObject["spy"] = 1;
             }
+            let attack = {};
+            // origin, target, slowest, arrival, type, drawIn=true, sent=false, units
             for (let pair of calculatedFakePairs) {
+                const villageData = unchangedTroopData.find(village => village.villageId == pair[0].villageId);
+                let link
+                if (!villageData) {
+                    console.error("Village not found in unchangedTroopData", villageId1, unchangedTroopData);
+                    continue;
+                }
                 if (unitSelectionType == "manually") {
-                    generatedFakeLinks.push(generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitsToSend, unchangedTroopData, unitsToKeep));
+                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitsToSend, unchangedTroopData, unitsToKeep);
+                    generatedFakeLinks.push(link);
+                    attack = {
+                        origin: pair[0].villageId,
+                        target: getVillageIdFromCoord(pair[1]),
+                        slowestUnit: getSlowestUnit(unitsToSend, configSpeed),
+                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitsToSend, configSpeed)),
+                        type: "14",
+                        drawIn: true,
+                        sent: false,
+                        units: calculateUnitsToSend(unitsToSend, villageData, unitsToKeep),
+                        link: link,
+                    };
+                    ALL_ATTACKS.push(attack);
                 } else if (unitSelectionType == "dynamically") {
                     unitObject["catapult"] = getMinAmountOfCatapults(pair[0].points, fakeLimit);
-                    generatedFakeLinks.push(generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitObject, unchangedTroopData, unitsToKeep));
+                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitObject, unchangedTroopData, unitsToKeep);
+                    generatedFakeLinks.push(link);
+                    attack = {
+                        origin: pair[0].villageId,
+                        target: getVillageIdFromCoord(pair[1]),
+                        slowestUnit: getSlowestUnit(unitsToSend, configSpeed),
+                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitsToSend, configSpeed)),
+                        type: "14",
+                        drawIn: true,
+                        sent: false,
+                        units: calculateUnitsToSend(unitObject, villageData, unitsToKeep),
+                        link: link,
+                    };
+                    ALL_ATTACKS.push(attack);
                 } else {
                     console.error("Invalid unit selection type", unitSelectionType)
                     return;
@@ -1099,7 +1158,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         }
                         if (!timeBool) continue;
                         // We want to arrive shortly before the night bonus to give the player time to send the attacks
-                        if (avoidNightBonus) {
+                        if (avoidNightBonus && nightBonusActive) {
                             const time = new Date(currentTime + travelTime);
                             const currentTotalTime = (time.getHours() + time.getMinutes() / 60);
 
@@ -1432,27 +1491,58 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             return defaultUnitsObject;
         }
 
-        // Helper: Function to generate a link from villageIds
-        function generateLink(villageId1, villageId2, unitObject, unchangedTroopData, unitsToKeep) {
-            let completeLink = getCurrentURL();
-            if (twSDK.sitterId.length > 0) {
-                completeLink += `?${twSDK.sitterId}&village=${villageId1}&screen=place&target=${villageId2}`;
-            } else {
-                completeLink += `?village=${villageId1}&screen=place&target=${villageId2}`;
-            }
+        function calculateArrivalTimeFromVillageIds(villageId1, villageId2, unitSpeed) {
+            const currentTime = parseInt(Date.now());
+            const villageCoord1 = villageMap.get(villageId1);
+            const villageCoord2 = villageMap.get(villageId2);
+            const distance = twSDK.calculateDistance(villageCoord1, villageCoord2);
+            const travelTime = parseInt(twSDK.getTravelTimeInSecond(distance, unitSpeed)) * 1000;
+            const arrivalTime = parseInt(currentTime) + parseInt(travelTime);
+            return arrivalTime;
+        }
 
-            let unitAmount;
-
-            const villageData = unchangedTroopData.find(village => village.villageId == villageId1);
-
-            if (!villageData) {
-                console.error("Village not found in unchangedTroopData", villageId1, unchangedTroopData);
+        // origin, target, slowestUnit, arrivalTime, type, drawIn=true, sent=false, units
+        function exportAttacks() {
+            if (ALL_ATTACKS.length === 0) {
+                UI.ErrorMessage(twSDK.tt('No attacks to export!'));
                 return;
             }
+            let exportWB = "";
+            for (let attack of ALL_ATTACKS) {
+                let {
+                    origin,
+                    target,
+                    slowestUnit,
+                    arrivalTime,
+                    type,
+                    drawIn,
+                    sent,
+                    units
+                } = attack;
+
+                let arrTimestamp = (new Date(arrivalTime).getTime()) + parseInt(type);
+                exportWB += origin + "&" + target + "&" + slowestUnit +
+                    "&" + arrTimestamp + "&" + type + "&" + drawIn + "&" + sent;
+
+                for (let unit in units) {
+                    exportWB += "&" + unit + "=" + btoa(units[unit]);
+                }
+
+                exportWB += "\n";
+            }
+            if (DEBUG) console.debug(`${scriptInfo}: Created export string: ${exportWB}`);
+            twSDK.copyToClipboard(exportWB);
+        }
+
+        // Helper: Function to calculate units to send
+        function calculateUnitsToSend(unitObject, villageData, unitsToKeep) {
+            let unitAmount;
+            let unitsToSend = {};
+
             for (const unitType in unitObject) {
                 if (unitObject[unitType] > 0) {
-                    // If the value is greater than 0, append to the link
-                    completeLink += `&${unitType}=${unitObject[unitType]}`;
+                    // If the value is greater than 0, add to the unitsToSend object
+                    unitsToSend[unitType] = unitObject[unitType];
                 } else if (unitObject[unitType] === -1 && villageData[unitType] >= 0) {
                     // If the value is -1, use the value from unchangedTroopData if available
                     if (unitsToKeep[unitType] >= 0) {
@@ -1461,9 +1551,30 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                         unitAmount = 0;
                         console.error("Too many -1, idk whats going on")
                     }
-                    completeLink += `&${unitType}=${unitAmount}`;
+                    unitsToSend[unitType] = unitAmount;
                 }
             }
+
+            return unitsToSend;
+        }
+
+        // Helper: Function to generate a link from villageIds
+        function generateLink(villageId1, villageId2, unitObject, villageData, unitsToKeep) {
+            let completeLink = getCurrentURL();
+            if (twSDK.sitterId.length > 0) {
+                completeLink += `?${twSDK.sitterId}&village=${villageId1}&screen=place&target=${villageId2}`;
+            } else {
+                completeLink += `?village=${villageId1}&screen=place&target=${villageId2}`;
+            }
+
+
+
+            const unitsToSend = calculateUnitsToSend(unitObject, villageData, unitsToKeep);
+
+            for (const unitType in unitsToSend) {
+                completeLink += `&${unitType}=${unitsToSend[unitType]}`;
+            }
+
             return completeLink;
         }
 
@@ -1472,11 +1583,27 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             const unitSpeeds = [];
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
+                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
                     const speed = unitInfo[unitType]?.speed || 0;
                     unitSpeeds.push(speed);
                 }
             }
             return Math.max(...unitSpeeds, 0); // Return the highest speed, or 0 if the array is empty
+        }
+        function getSlowestUnit(unitsToSend, unitInfo) {
+            let slowestUnit = "";
+            let slowestSpeed = 0;
+            for (const unitType in unitsToSend) {
+                if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
+                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
+                    const speed = unitInfo[unitType]?.speed || 0;
+                    if (speed > slowestSpeed) {
+                        slowestSpeed = speed;
+                        slowestUnit = unitType;
+                    }
+                }
+            }
+            return slowestUnit;
         }
 
         // Helper: Villages array to dictionary, to quickly search with coordinates
@@ -1582,9 +1709,15 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let openTabsDiv = document.getElementById("open_tabs");
 
             // Reset the buttons
-            openTabsDiv.innerHTML = `<h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>`;
+            openTabsDiv.innerHTML = `                    <div>
+            <h2 id="h2_tabs"><center style="margin:10px"><u>${twSDK.tt('Open Tabs')}</u></center></h2>
+        </div>
+        <div id="exportWBFG">
+            <button id="exportPlanFG" class="btn ra-mb10">${twSDK.tt('Export WB')}</button>
+        </div>`;
             // Make the 'open_tabs' div invisible
             openTabsDiv.style.display = "none";
+
         }
 
         function createSendButtons(URIs) {
@@ -1599,6 +1732,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
             // Reset the buttons
             clearButtons();
+            jQuery('#exportPlanFG').on('click', function () {
+                if (DEBUG) console.debug(`${scriptInfo} Export Plan`);
+                exportAttacks();
+                UI.InfoMessage(twSDK.tt('Exported and copied to clipboard'));
+            });
 
             // Calculate the number of required buttons
             let nrButtons = Math.ceil(URIs.length / nrSplit);
@@ -1618,13 +1756,34 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 button.textContent = `[ ${start}-${end} ]`;
 
                 // Add a click event listener to each button
+                /* 
+                    attack = {
+                        origin: pair[0].villageId,
+                        target: getVillageIdFromCoord(pair[1]),
+                        slowestUnit: getSlowestUnit(unitsToSend, configSpeed),
+                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitsToSend, configSpeed)),
+                        type: "14",
+                        drawIn: true,
+                        sent: false,
+                        units: calculateUnitsToSend(unitObject, villageData, unitsToKeep),
+                        link: link,
+                    };
+                    ALL_ATTACKS.push(attack);
+                */
                 button.addEventListener('click', function () {
                     // Set button to grey after it's clicked
                     this.classList.remove('btn-confirm-yes');
                     this.classList.add('btn-confirm-clicked');
                     // Open each link in new tab
                     URIs.slice(start - 1, end).forEach((link, index) => {  // adjust start for zero-based index
-                        setTimeout(() => { window.open(link) }, index * delay);
+                        setTimeout(() => {
+                            window.open(link);
+                            // Find the corresponding attack and set its 'sent' property to true
+                            let attack = ALL_ATTACKS.find(attack => attack.link === link);
+                            if (attack) {
+                                attack.sent = true;
+                            }
+                        }, index * delay);
                     })
                 });
                 // Add an additional event listener to prevent the "Enter" key from triggering the button

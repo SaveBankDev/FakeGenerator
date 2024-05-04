@@ -1584,7 +1584,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
                     if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
-                    const speed = unitInfo[unitType]?.speed || 0;
+                    const speed = parseInt(unitInfo[unitType]?.speed) || 0;
                     unitSpeeds.push(speed);
                 }
             }
@@ -1596,8 +1596,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
                     if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
-                    const speed = unitInfo[unitType]?.speed || 0;
-                    if (speed < slowestSpeed) {
+                    const speed = parseInt(unitInfo[unitType]?.speed) || 0;
+                    if (speed > slowestSpeed) {
                         slowestSpeed = speed;
                         slowestUnit = unitType;
                     }

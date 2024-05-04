@@ -1,6 +1,6 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.3
+* Version: v2.3.1
 * Last Updated: 2024-04-29
 * Author: SaveBank
 * Author Contact: Discord: savebank
@@ -47,7 +47,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.3',
+        version: 'v2.3.1',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',

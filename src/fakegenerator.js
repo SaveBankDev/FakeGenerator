@@ -1077,8 +1077,8 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     attack = {
                         origin: pair[0].villageId,
                         target: getVillageIdFromCoord(pair[1]),
-                        slowestUnit: getSlowestUnit(unitsToSend, configSpeed),
-                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitsToSend, configSpeed)),
+                        slowestUnit: getSlowestUnit(unitObject, configSpeed),
+                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitObject, configSpeed)),
                         type: "14",
                         drawIn: true,
                         sent: false,
@@ -1522,13 +1522,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
                 let arrTimestamp = (new Date(arrivalTime).getTime()) + parseInt(type);
                 exportWB += origin + "&" + target + "&" + slowestUnit +
-                    "&" + arrTimestamp + "&" + type + "&" + drawIn + "&" + sent;
+                    "&" + arrTimestamp + "&" + type + "&" + drawIn + "&" + sent + "&";
 
+                let unitsArray = [];
                 for (let unit in units) {
-                    exportWB += "&" + unit + "=" + btoa(units[unit]);
+                    unitsArray.push(unit + "=" + btoa(units[unit]));
                 }
-
-                exportWB += "\n";
+                exportWB += unitsArray.join('/') + "\n";
             }
             if (DEBUG) console.debug(`${scriptInfo}: Created export string: ${exportWB}`);
             twSDK.copyToClipboard(exportWB);
@@ -1756,20 +1756,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 button.textContent = `[ ${start}-${end} ]`;
 
                 // Add a click event listener to each button
-                /* 
-                    attack = {
-                        origin: pair[0].villageId,
-                        target: getVillageIdFromCoord(pair[1]),
-                        slowestUnit: getSlowestUnit(unitsToSend, configSpeed),
-                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitsToSend, configSpeed)),
-                        type: "14",
-                        drawIn: true,
-                        sent: false,
-                        units: calculateUnitsToSend(unitObject, villageData, unitsToKeep),
-                        link: link,
-                    };
-                    ALL_ATTACKS.push(attack);
-                */
                 button.addEventListener('click', function () {
                     // Set button to grey after it's clicked
                     this.classList.remove('btn-confirm-yes');

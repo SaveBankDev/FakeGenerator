@@ -1595,9 +1595,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let slowestSpeed = 0;
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
-                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
+                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}`);
                     const speed = parseInt(unitInfo[unitType]?.speed) || 0;
+                    if (DEBUG) console.debug(`${scriptInfo} Speed: ${speed}`);
                     if (speed > slowestSpeed) {
+                        if (DEBUG) console.debug(`${scriptInfo} New slowest unit: ${unitType}`);
                         slowestSpeed = speed;
                         slowestUnit = unitType;
                     }

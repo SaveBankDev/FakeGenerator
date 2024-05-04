@@ -1049,14 +1049,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let attack = {};
             // origin, target, slowest, arrival, type, drawIn=true, sent=false, units
             for (let pair of calculatedFakePairs) {
-                const villageData = unchangedTroopData.find(village => village.villageId == pair[0].villageId);
+                let villageData = unchangedTroopData.find(village => village.villageId == pair[0].villageId);
                 let link
                 if (!villageData) {
                     console.error("Village not found in unchangedTroopData", villageId1, unchangedTroopData);
                     continue;
                 }
                 if (unitSelectionType == "manually") {
-                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitsToSend, unchangedTroopData, unitsToKeep);
+                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitsToSend, villageData, unitsToKeep);
                     generatedFakeLinks.push(link);
                     attack = {
                         origin: pair[0].villageId,
@@ -1072,7 +1072,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     ALL_ATTACKS.push(attack);
                 } else if (unitSelectionType == "dynamically") {
                     unitObject["catapult"] = getMinAmountOfCatapults(pair[0].points, fakeLimit);
-                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitObject, unchangedTroopData, unitsToKeep);
+                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitObject, villageData, unitsToKeep);
                     generatedFakeLinks.push(link);
                     attack = {
                         origin: pair[0].villageId,

@@ -47,7 +47,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.3.1',
+        version: 'v2.3.2',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',

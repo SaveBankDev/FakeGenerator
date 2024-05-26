@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.3
-* Last Updated: 2024-04-29
+* Version: v2.3.2
+* Last Updated: 2024-05-26
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -47,7 +47,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.3',
+        version: 'v2.3.1',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -159,7 +159,7 @@ var scriptConfig = {
     enableCountApi: false
 };
 
-$.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript.src}`,
+$.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@main/twSDK.js`,
     async function () {
         // Initialize Library
         if (DEBUG) {
@@ -1049,14 +1049,14 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let attack = {};
             // origin, target, slowest, arrival, type, drawIn=true, sent=false, units
             for (let pair of calculatedFakePairs) {
-                const villageData = unchangedTroopData.find(village => village.villageId == pair[0].villageId);
+                let villageData = unchangedTroopData.find(village => village.villageId == pair[0].villageId);
                 let link
                 if (!villageData) {
                     console.error("Village not found in unchangedTroopData", villageId1, unchangedTroopData);
                     continue;
                 }
                 if (unitSelectionType == "manually") {
-                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitsToSend, unchangedTroopData, unitsToKeep);
+                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitsToSend, villageData, unitsToKeep);
                     generatedFakeLinks.push(link);
                     attack = {
                         origin: pair[0].villageId,
@@ -1072,13 +1072,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                     ALL_ATTACKS.push(attack);
                 } else if (unitSelectionType == "dynamically") {
                     unitObject["catapult"] = getMinAmountOfCatapults(pair[0].points, fakeLimit);
-                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitObject, unchangedTroopData, unitsToKeep);
+                    link = generateLink(pair[0].villageId, getVillageIdFromCoord(pair[1]), unitObject, villageData, unitsToKeep);
                     generatedFakeLinks.push(link);
                     attack = {
                         origin: pair[0].villageId,
                         target: getVillageIdFromCoord(pair[1]),
-                        slowestUnit: getSlowestUnit(unitsToSend, configSpeed),
-                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitsToSend, configSpeed)),
+                        slowestUnit: getSlowestUnit(unitObject, configSpeed),
+                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitObject, configSpeed)),
                         type: "14",
                         drawIn: true,
                         sent: false,
@@ -1522,13 +1522,13 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
 
                 let arrTimestamp = (new Date(arrivalTime).getTime()) + parseInt(type);
                 exportWB += origin + "&" + target + "&" + slowestUnit +
-                    "&" + arrTimestamp + "&" + type + "&" + drawIn + "&" + sent;
+                    "&" + arrTimestamp + "&" + type + "&" + drawIn + "&" + sent + "&";
 
+                let unitsArray = [];
                 for (let unit in units) {
-                    exportWB += "&" + unit + "=" + btoa(units[unit]);
+                    unitsArray.push(unit + "=" + btoa(units[unit]));
                 }
-
-                exportWB += "\n";
+                exportWB += unitsArray.join('/') + "\n";
             }
             if (DEBUG) console.debug(`${scriptInfo}: Created export string: ${exportWB}`);
             twSDK.copyToClipboard(exportWB);
@@ -1584,7 +1584,7 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
                     if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
-                    const speed = unitInfo[unitType]?.speed || 0;
+                    const speed = parseInt(unitInfo[unitType]?.speed) || 0;
                     unitSpeeds.push(speed);
                 }
             }
@@ -1595,9 +1595,11 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
             let slowestSpeed = 0;
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
-                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
-                    const speed = unitInfo[unitType]?.speed || 0;
+                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}`);
+                    const speed = parseInt(unitInfo[unitType]?.speed) || 0;
+                    if (DEBUG) console.debug(`${scriptInfo} Speed: ${speed}`);
                     if (speed > slowestSpeed) {
+                        if (DEBUG) console.debug(`${scriptInfo} New slowest unit: ${unitType}`);
                         slowestSpeed = speed;
                         slowestUnit = unitType;
                     }
@@ -1756,20 +1758,6 @@ $.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript
                 button.textContent = `[ ${start}-${end} ]`;
 
                 // Add a click event listener to each button
-                /* 
-                    attack = {
-                        origin: pair[0].villageId,
-                        target: getVillageIdFromCoord(pair[1]),
-                        slowestUnit: getSlowestUnit(unitsToSend, configSpeed),
-                        arrivalTime: calculateArrivalTimeFromVillageIds(pair[0].villageId, getVillageIdFromCoord(pair[1]), getSlowestSpeed(unitsToSend, configSpeed)),
-                        type: "14",
-                        drawIn: true,
-                        sent: false,
-                        units: calculateUnitsToSend(unitObject, villageData, unitsToKeep),
-                        link: link,
-                    };
-                    ALL_ATTACKS.push(attack);
-                */
                 button.addEventListener('click', function () {
                     // Set button to grey after it's clicked
                     this.classList.remove('btn-confirm-yes');

@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.3.1
-* Last Updated: 2024-04-29
+* Version: v2.3.2
+* Last Updated: 2024-05-26
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -47,7 +47,7 @@ var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.3.1',
+        version: 'v2.3.2',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -159,7 +159,7 @@ var scriptConfig = {
     enableCountApi: false
 };
 
-$.getScript(`https://twscripts.dev/scripts/twSDK.js?url=${document.currentScript.src}`,
+$.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@main/twSDK.js`,
     async function () {
         // Initialize Library
         if (DEBUG) {

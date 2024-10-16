@@ -1,7 +1,7 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.3.2
-* Last Updated: 2024-05-26
+* Version: v2.4.0
+* Last Updated: 2024-10-16
 * Author: SaveBank
 * Author Contact: Discord: savebank
 * Contributor: RedAlert 
@@ -1906,7 +1906,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             }
             const units = game_data.units;
             let contentManualUnitSelection = "";
-            const unitsToIgnore = ['militia', 'snob'];
+            const unitsToIgnore = ['militia'];
             let unitTableSend = buildUnitsPicker(unitsToIgnore, "send", 'number');
             let unitTableKeep = buildUnitsPicker(unitsToIgnore, "keep", 'number');
 

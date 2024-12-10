@@ -1386,7 +1386,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             for (let playerVillage of playerVillages) {
                 let numberOfAttacksOfThisVillage = 0;
                 if (unitSelectionType === "dynamically") {
-                    unitsToSend["catapult"] = getMinAmountOfCatapults(playerVillage.points, parseInt(worldConfig.config.game.fake_limit));
+                    unitsToSend["catapult"] = getMinAmountOfCatapults(getVillagePointsFromCoord(playerVillage.coord), parseInt(worldConfig.config.game.fake_limit));
                     subtractUnitsFromVillage(playerVillage, keepCatapultsObject);
                 } else if (unitSelectionType === "manually") {
                     subtractUnitsFromVillage(playerVillage, units_to_keep);

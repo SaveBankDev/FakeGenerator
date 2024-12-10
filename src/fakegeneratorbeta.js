@@ -41,7 +41,7 @@ var TROOP_POP = {
 }
 
 var ALL_ATTACKS = [];
-
+var ARRIVAL_HOURS = new Map();;
 
 var scriptConfig = {
     scriptData: {
@@ -901,6 +901,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             // Time to calculate calculation time
             let startTime = new Date().getTime();
             ALL_ATTACKS = [];
+            ARRIVAL_HOURS = new Map();;
             let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend);
             if (DEBUG) {
                 let endTimeGetAll = new Date().getTime();
@@ -1018,6 +1019,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             if (DEBUG) {
                 let endTimeWhile = new Date().getTime();
                 if (DEBUG) console.debug(`${scriptInfo} The script took ${endTimeWhile - startTimeWhile} milliseconds to calculate ${whileCounter} while loops for ${(endTimeWhile - startTimeWhile) / whileCounter} ms per while loops.`);
+                if (DEBUG) console.debug(`${scriptInfo} Arrival Hours: `, ARRIVAL_HOURS);
             }
             if (DEBUG) console.debug(`${scriptInfo} Calculated fake pairs: ${calculatedFakePairs}`);
             if (DEBUG) {
@@ -1131,6 +1133,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             const nightBonusOffset = parseInt(localStorageObject.buffer_nightbonus);
             const avoidNightBonus = parseBool(localStorageObject.avoid_nightbonus);
             let playerVillagesWithEnoughUnits = [];
+
             if (unitSelectionType === "manually") {
                 // Subtract units_to_keep from player villages 
                 unitSpeed = getSlowestSpeed(unitsToSend, configSpeed)
@@ -1173,7 +1176,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                             }
                             if (!nightBool) continue;
                         }
-                        subArray.push(playerVillage);
+                        subArray.push({originVillage: playerVillage, arrivalTime: new Date(timestamp).getHours()});
                         amountOfCombinations += 1;
                     }
                     allCombinations.push(subArray);
@@ -1227,7 +1230,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                             }
                             if (!nightBool) continue;
                         }
-                        subArray.push(playerVillage);
+                        subArray.push({originVillage: playerVillage, arrivalTime: new Date(timestamp).getHours()});
                         amountOfCombinations += 1;
                     }
                     allCombinations.push(subArray);
@@ -1245,8 +1248,8 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             const maxAttacksFromVillage = localStorageObject.max_attacks_per_village;
             if (parseInt(maxAttacksFromVillage) == 0) {
                 return [combination[0]].concat(combination.slice(1).sort((a, b) => {
-                    let villageIdA = a.villageId;
-                    let villageIdB = b.villageId;
+                    let villageIdA = a.originVillage.villageId;
+                    let villageIdB = b.originVillage.villageId;
 
                     let countA = counts.get(villageIdA);
                     let countB = counts.get(villageIdB);
@@ -1269,8 +1272,8 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                 }));
             } else if (parseInt(maxAttacksFromVillage) > 0) {
                 return [combination[0]].concat(combination.slice(1).sort((a, b) => {
-                    let villageIdA = a.villageId;
-                    let villageIdB = b.villageId;
+                    let villageIdA = a.originVillage.villageId;
+                    let villageIdB = b.originVillage.villageId;
 
                     let countA = counts.get(villageIdA);
                     let countB = counts.get(villageIdB);
@@ -1296,46 +1299,75 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             const unitsToSend = localStorageObject.units_to_send;
             const maxAttacksFromVillage = localStorageObject.max_attacks_per_village;
 
+            let eligibleVillages = [];
+
+            const possiblePercentages = [0.25, 0.37, 0.50];
+            let percentage = possiblePercentages[Math.floor(Math.random() * possiblePercentages.length)];
+
             let chosenVillage = null;
             if (unitSelectionType == "manually") {
                 for (let j = 1; j < combination.length; j++) {
                     let village = combination[j];
-                    if (usedPlayerVillages.get(village.villageId) >= maxAttacksFromVillage && maxAttacksFromVillage > 0) {
+                    if (usedPlayerVillages.get(village.originVillage.villageId) >= maxAttacksFromVillage && maxAttacksFromVillage > 0) {
                         continue;
                     }
-                    if (!isValidUnitsToSend(village, unitsToSend)) {
+                    if (!isValidUnitsToSend(village.originVillage, unitsToSend)) {
                         continue;
                     }
                     if (calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
                         continue;
                     }
-                    chosenVillage = village;
-                    break;
+                    eligibleVillages.push(village);
+                    if(eligibleVillages.length > Math.floor(combination.length * percentage)) {
+                        break;
+                    }
                 }
             } else if (unitSelectionType == "dynamically") {
                 for (let j = 1; j < combination.length; j++) {
                     let village = combination[j];
-                    if (usedPlayerVillages.get(village.villageId) >= maxAttacksFromVillage && maxAttacksFromVillage > 0) {
+                    if (usedPlayerVillages.get(village.originVillage.villageId) >= maxAttacksFromVillage && maxAttacksFromVillage > 0) {
                         continue;
                     }
-                    const minCat = getMinAmountOfCatapults(village.points, fakeLimit);
-                    if (!(village.catapult >= minCat)) {
+                    const minCat = getMinAmountOfCatapults(village.originVillage.points, fakeLimit);
+                    if (!(village.originVillage.catapult >= minCat)) {
                         continue;
                     }
                     if (calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
                         continue;
                     }
-                    if (spySend && village.spy <= 0) {
+                    if (spySend && village.originVillage.spy <= 0) {
                         continue;
                     }
-                    chosenVillage = village;
-                    break;
+                    eligibleVillages.push(village);
+                    if(eligibleVillages.length > Math.floor(combination.length * percentage)) {
+                        break;
+                    }
                 }
             } else {
                 console.error("Invalid unit selection type", unitSelectionType)
             }
 
-            return chosenVillage;
+            if (eligibleVillages.length == 0) {
+                return null;
+            }
+            
+            for (let village of eligibleVillages) {
+                if(!chosenVillage) {
+                    chosenVillage = village;
+                } else {
+                    if(ARRIVAL_HOURS.get(chosenVillage.arrivalTime) > ARRIVAL_HOURS.get(village.arrivalTime)) {
+                        chosenVillage = village;
+                    }
+                }
+            }
+            
+            if(ARRIVAL_HOURS.has(chosenVillage.arrivalTime)) {
+                ARRIVAL_HOURS.set(chosenVillage.arrivalTime, ARRIVAL_HOURS.get(chosenVillage.arrivalTime) + 1);
+            } else {
+                ARRIVAL_HOURS.set(chosenVillage.arrivalTime, 1);
+            }
+                
+            return chosenVillage.originVillage;
         }
 
         async function updateTotalPossibleNumberOfAttacks() {
@@ -1386,7 +1418,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             for (let playerVillage of playerVillages) {
                 let numberOfAttacksOfThisVillage = 0;
                 if (unitSelectionType === "dynamically") {
-                    unitsToSend["catapult"] = getMinAmountOfCatapults(playerVillage.points, parseInt(worldConfig.config.game.fake_limit));
+                    unitsToSend["catapult"] = getMinAmountOfCatapults(getVillagePointsFromCoord(playerVillage.coord), parseInt(worldConfig.config.game.fake_limit));
                     subtractUnitsFromVillage(playerVillage, keepCatapultsObject);
                 } else if (unitSelectionType === "manually") {
                     subtractUnitsFromVillage(playerVillage, units_to_keep);
@@ -1583,7 +1615,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             const unitSpeeds = [];
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
-                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
+                    // if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}  Speed ${unitInfo[unitType]?.speed}`);
                     const speed = parseInt(unitInfo[unitType]?.speed) || 0;
                     unitSpeeds.push(speed);
                 }
@@ -1595,11 +1627,11 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             let slowestSpeed = 0;
             for (const unitType in unitsToSend) {
                 if (unitsToSend[unitType] === -1 || unitsToSend[unitType] > 0) {
-                    if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}`);
+                    // if (DEBUG) console.debug(`${scriptInfo} Unit type: ${unitType}`);
                     const speed = parseInt(unitInfo[unitType]?.speed) || 0;
-                    if (DEBUG) console.debug(`${scriptInfo} Speed: ${speed}`);
+                    // if (DEBUG) console.debug(`${scriptInfo} Speed: ${speed}`);
                     if (speed > slowestSpeed) {
-                        if (DEBUG) console.debug(`${scriptInfo} New slowest unit: ${unitType}`);
+                        // if (DEBUG) console.debug(`${scriptInfo} New slowest unit: ${unitType}`);
                         slowestSpeed = speed;
                         slowestUnit = unitType;
                     }
@@ -1669,7 +1701,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
 
             array.forEach((subArray) => {
                 subArray.slice(1).forEach((object) => {
-                    let villageId = object.villageId;  // Renamed variable
+                    let villageId = object.originVillage.villageId;  // Renamed variable
 
                     if (!counts.has(villageId)) {
                         counts.set(villageId, 1);

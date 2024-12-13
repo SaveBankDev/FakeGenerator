@@ -901,7 +901,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
             // Time to calculate calculation time
             let startTime = new Date().getTime();
             ALL_ATTACKS = [];
-            ARRIVAL_HOURS = new Map();;
+            ARRIVAL_HOURS = new Map();
             let { amountOfCombinations, allCombinations } = getAllPossibleCombinations(playerVillages, targetCoords, configSpeed, nightInfo, fakeLimit, spySend);
             if (DEBUG) {
                 let endTimeGetAll = new Date().getTime();

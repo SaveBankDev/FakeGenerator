@@ -1,6 +1,6 @@
 /* 
 * Script Name: Fake Generator
-* Version: v2.3.3
+* Version: v2.3.4
 * Last Updated: 2024-10-16
 * Author: SaveBank
 * Author Contact: Discord: savebank
@@ -41,13 +41,13 @@ var TROOP_POP = {
 }
 
 var ALL_ATTACKS = [];
-var ARRIVAL_HOURS = new Map();;
+var ARRIVAL_HOURS = new Map();
 
 var scriptConfig = {
     scriptData: {
         prefix: 'fakegenerator',
         name: 'Fake Generator',
-        version: 'v2.3.3',
+        version: 'v2.3.4',
         author: 'SaveBank',
         authorUrl: 'https://forum.tribalwars.net/index.php?members/savebank.131111/',
         helpLink: 'https://forum.tribalwars.net/index.php?threads/fakegenerator.291767/',
@@ -1301,7 +1301,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
 
             let eligibleVillages = [];
 
-            const possiblePercentages = [0.25, 0.37, 0.50];
+            const possiblePercentages = [0.25, 0.37, 0.50, 0.62, 0.75];
             let percentage = possiblePercentages[Math.floor(Math.random() * possiblePercentages.length)];
 
             let chosenVillage = null;
@@ -1314,7 +1314,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                     if (!isValidUnitsToSend(village.originVillage, unitsToSend)) {
                         continue;
                     }
-                    if (calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
+                    if (calculatedFakePairs.some(pair => pair[0] === village.originVillage && pair[1] === combination[0])) {
                         continue;
                     }
                     eligibleVillages.push(village);
@@ -1332,7 +1332,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                     if (!(village.originVillage.catapult >= minCat)) {
                         continue;
                     }
-                    if (calculatedFakePairs.some(pair => pair[0] === village && pair[1] === combination[0])) {
+                    if (calculatedFakePairs.some(pair => pair[0] === village.originVillage && pair[1] === combination[0])) {
                         continue;
                     }
                     if (spySend && village.originVillage.spy <= 0) {

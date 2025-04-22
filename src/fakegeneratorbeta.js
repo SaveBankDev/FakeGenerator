@@ -2012,6 +2012,8 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                 const htmlDoc = jQuery.parseHTML(response);
                 const homeTroops = [];
         
+                const pageSize = parseInt(jQuery(htmlDoc).find("input[name='page_size']").val(), 10);
+        
                 if (mobileCheck) {
                     let table = jQuery(htmlDoc).find('#combined_table tr.nowrap');
                     for (let i = 0; i < table.length; i++) {
@@ -2028,7 +2030,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                             .map((e) => ({
                                 name: e.src
                                     .split('unit_')[1]
-                                    .replace('@2x.png', ''),
+                                    .replace('@2x.webp', ''),
                                 value: parseInt(
                                     e.parentElement.nextElementSibling.innerText
                                 ),
@@ -2057,7 +2059,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                         const thImage = jQuery(this).find('img').attr('src');
                         if (thImage) {
                             let thImageFilename = thImage.split('/').pop();
-                            thImageFilename = thImageFilename.replace('.png', '');
+                            thImageFilename = thImageFilename.replace('.webp', '');
                             combinedTableHeader.push(thImageFilename);
                         } else {
                             combinedTableHeader.push(null);
@@ -2095,26 +2097,31 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                     });
                 }
         
-                return homeTroops;
+                return { homeTroops, pageSize };
             }
         
             try {
                 if (totalVillages <= 1000) {
                     // If the player has less than or equal to 1000 villages, use page=-1 for efficiency
                     UI.SuccessMessage(twSDK.tt('Fetching troop data...'));
-                    const homeTroops = await fetchPageData(-1);
+                    const { homeTroops } = await fetchPageData(-1);
                     troopsForGroup.push(...homeTroops);
                 } else {
                     UI.SuccessMessage(twSDK.tt('Fetching troop data for a large account. This may take a while...'));
                     let page = 0;
                     let totalProcessedVillages = 0;
-                    const pageSize = parseInt($("input[name='page_size']").val(), 10);
+                    let pageSize = 0;
         
                     // Loop through pages until all villages are processed
                     while (totalProcessedVillages < totalVillages) {
-                        const homeTroops = await fetchPageData(page);
+                        const { homeTroops, pageSize: currentPageSize } = await fetchPageData(page);
                         troopsForGroup.push(...homeTroops);
                         totalProcessedVillages += homeTroops.length;
+        
+                        // Update pageSize if it's the first page
+                        if (page === 0) {
+                            pageSize = currentPageSize;
+                        }
         
                         // If the number of processed villages is less than the page size, we have reached the last page
                         if (homeTroops.length < pageSize) {
@@ -2125,7 +2132,11 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                         await new Promise(resolve => setTimeout(resolve, 200)); // Wait for 200 ms before the next request
                     }
                 }
-    
+        
+                // Check if we have data for the same number of villages as the player has in the game_data object
+                if (troopsForGroup.length !== totalVillages) {
+                    console.error("Mismatch in the number of villages processed:", troopsForGroup.length, "expected:", totalVillages);
+                }
         
                 return troopsForGroup;
             } catch (error) {
@@ -2311,7 +2322,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                     thUnits += `
                         <th class="ra-text-center">
                             <label for="${id_prefix}_unit_${unit}">
-                                <img src="/graphic/unit/unit_${unit}.png">
+                                <img src="/graphic/unit/unit_${unit}.webp">
                             </label>
                         </th>
                     `;

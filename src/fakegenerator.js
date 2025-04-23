@@ -2001,7 +2001,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
         }
         async function fetchTroopsForCurrentGroup(groupId) {
             const mobileCheck = jQuery('#mobileHeader').length > 0;
-            const totalVillages = game_data.player.villages;
+            const totalVillages = parseInt(game_data.player.villages);
             const troopsForGroup = [];
         
             // Function to fetch and process data for a single page

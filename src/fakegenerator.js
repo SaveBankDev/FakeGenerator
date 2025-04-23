@@ -103,6 +103,7 @@ var scriptConfig = {
             'Exported and copied to clipboard': 'Exported and copied to clipboard',
             'Fetching troop data...' : 'Fetching troop data...',
             'Fetching troop data for a large account. This may take a while...' : 'Fetching troop data for a large account. This may take a while...',
+            'Troop data fetched successfully!': 'Troop data fetched successfully!',
         },
         de_DE: {
             'Redirecting...': 'Weiterleiten...',
@@ -154,6 +155,7 @@ var scriptConfig = {
             'Exported and copied to clipboard': 'Exportiert und in die Zwischenablage kopiert',
             'Fetching troop data...' : 'Truppendaten werden geladen...',
             'Fetching troop data for a large account. This may take a while...' : 'Truppendaten für einen großen Account werden geladen. Dies kann eine Weile dauern...',
+            'Troop data fetched successfully!': 'Truppendaten wurden erfolgreich geladen!',
         }
     },
     allowedMarkets: [],
@@ -2131,6 +2133,7 @@ $.getScript(`https://cdn.jsdelivr.net/gh/SaveBankDev/Tribal-Wars-Scripts-SDK@mai
                         page++;
                         await new Promise(resolve => setTimeout(resolve, 200)); // Wait for 200 ms before the next request
                     }
+                    UI.SuccessMessage(twSDK.tt('Troop data fetched successfully!'));
                 }
         
                 // Check if we have data for the same number of villages as the player has in the game_data object

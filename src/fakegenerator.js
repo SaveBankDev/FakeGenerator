@@ -10,6 +10,11 @@
 * Mod: RedAlert
 */
 
+
+/*
+By uploading a user-generated mod (script) for use with Tribal Wars, the creator grants InnoGames a perpetual, irrevocable, worldwide, royalty-free, non-exclusive license to use, reproduce, distribute, publicly display, modify, and create derivative works of the mod. This license permits InnoGames to incorporate the mod into any aspect of the game and its related services, including promotional and commercial endeavors, without any requirement for compensation or attribution to the uploader. The uploader represents and warrants that they have the legal right to grant this license and that the mod does not infringe upon any third-party rights.
+*/
+
 // User Input
 if (typeof DEBUG !== 'boolean') DEBUG = false;
 if (typeof BIG_SERVER !== 'boolean') BIG_SERVER = false;
